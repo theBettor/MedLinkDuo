@@ -23,8 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.bettor.medlinkduo.core.common.Phase
 import com.bettor.medlinkduo.di.AppDepsEntryPoint
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -108,92 +110,95 @@ fun MeasurementScreen(
 
         Spacer(Modifier.height(20.dp))
 
+        // 상단 state 구독 + 가드 플래그 추가
+        val ui by vm.ui.collectAsState()
+        val guard = rememberActionGuard(scope)   // ← 한 줄로 가드 준비
+
+        @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            maxItemsInEachRow = 3, // 화면 폭에 맞춰 2~3으로 조절 가능
+            maxItemsInEachRow = 3,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement   = Arrangement.spacedBy(12.dp)
         ) {
+            // 측정
             Button(
                 onClick = {
-                    scope.launch {
+                    guard.launch {
                         tts.speakAndWait("측정을 시작합니다.")
-                        haptics.play(HapticEvent.Connected, ph)   // 👈 성공 패턴(짧게-간격-짧게)
+                        haptics.play(HapticEvent.Connected, ph)
                         vm.remeasure()
                     }
                 },
-                modifier = Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button }
+                enabled = !guard.acting && !ui.busy && ui.phase != Phase.Measuring,
+                modifier = Modifier.minTouchTarget().semantics { role = Role.Button }
             ) { Text("측정") }
 
+            // 중단
             OutlinedButton(
                 onClick = {
-                    vm.pause()
-                    haptics.play(HapticEvent.SafeStop, ph)        // 👈 넘겨도 동작 동일
-                    tts.speak("측정을 중단했습니다.")
+                    guard.launch {
+                        vm.pause()
+                        haptics.play(HapticEvent.SafeStop, ph)
+                        tts.speak("측정을 중단했습니다.")
+                    }
                 },
-                modifier = Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button }
+                enabled = !guard.acting && !ui.busy && ui.phase == Phase.Measuring,
+                modifier = Modifier.minTouchTarget().semantics { role = Role.Button }
             ) { Text("중단") }
 
+            // 측정 종료 → Feedback
             OutlinedButton(
                 onClick = {
-                    vm.end()
-                    scope.launch {
-                        haptics.play(HapticEvent.ScanDone, ph)    // (선택) 종료 직전 짧은 확인
+                    guard.launch {
+                        vm.end()
+                        haptics.play(HapticEvent.ScanDone, ph)
                         tts.speakAndWait("측정 결과를 보여드립니다.")
                         onShowFeedback()
                     }
                 },
-                modifier = Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button }
+                enabled = !guard.acting && !ui.busy && ui.phase != Phase.Idle,
+                modifier = Modifier.minTouchTarget().semantics { role = Role.Button }
             ) { Text("측정 종료") }
 
-            // 음성명령 버튼
+            // 음성명령
             VoiceCommandButton(
-                onRepeat = {
-                    last?.let { m -> scope.launch { speakNumeric(m) } }
-                },
+                onRepeat = { last?.let { m -> scope.launch { speakNumeric(m) } } },
                 onReMeasure = {
-                    scope.launch {
-                        // tts.stop()  // (선택)
+                    guard.launch {
                         tts.speakAndWait("측정을 시작합니다.")
                         vm.remeasure()
                     }
                 },
                 onPause = {
-                    vm.pause()
-                    tts.speak("측정을 중단했습니다.")
+                    guard.launch {
+                        vm.pause();
+                        tts.speak("측정을 중단했습니다.")
+                    }
                 },
                 onEnd = {
-                    vm.end()
-                    scope.launch {
-                        tts.speakAndWait("측정 결과를 보여드립니다.")
+                    guard.launch {
+                        vm.end();
+                        tts.speakAndWait("측정 결과를 보여드립니다.");
                         onShowFeedback()
                     }
                 },
                 onGoScan = {
-                    vm.end()
-                    scope.launch {
-                        tts.speakAndWait("기기 선택 화면으로 돌아갑니다.")
-                        onGoToScan()
+                    guard.launch {
+                        vm.end(); tts.speakAndWait("기기 선택 화면으로 돌아갑니다."); onGoToScan()
                     }
                 }
             )
+
+            // 기기 선택 화면으로
             OutlinedButton(
                 onClick = {
-                    vm.end()
-                    scope.launch {
-                        tts.speakAndWait("기기 선택 화면으로 돌아갑니다.")
-                        onGoToScan()
+                    guard.launch {
+                        vm.end(); tts.speakAndWait("기기 선택 화면으로 돌아갑니다."); onGoToScan()
                     }
                 },
-                modifier = Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button }
+                enabled = !guard.acting,
+                modifier = Modifier.minTouchTarget().semantics { role = Role.Button }
             ) { Text("기기 선택 화면으로") }
         }
     }
