@@ -6,11 +6,13 @@ import kotlinx.coroutines.flow.StateFlow
 interface BleRepository {
     val connectionState: StateFlow<ConnectionState>
     val measurements: Flow<Measurement>
+
     suspend fun scan(): Flow<List<BleDevice>>
+
     suspend fun connect(d: BleDevice)
+
     suspend fun disconnect()
 }
-
 
 interface TtsController {
     /** 큐를 비우고 즉시 말함(대기 없음) */

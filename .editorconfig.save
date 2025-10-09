@@ -1,0 +1,12 @@
+root = true
+
+[*.{kt,kts}]
+ktlint_code_style = ktlint_official
+max_line_length = 120
+insert_final_newline = true
+
+# import 정렬(IDE와 충돌 날 때 안전한 레이아웃)
+ij_kotlin_imports_layout = *,java.**,javax.**,kotlin.**,^
+
+# Compose/Preview 는 PascalCase 함수명 허용 (기본 규칙 예외)
+ktlint_function_naming_ignore_when_annotated_with = Composable,Preview

@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.kapt")
     id("com.google.dagger.hilt.android")
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
 }
 
 android {
@@ -20,6 +21,13 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        ktlint {
+            version.set("1.2.1")
+            android.set(true)
+            filter {
+                exclude("**/generated/**", "**/build/**")
+            }
+        }
     }
 
     buildTypes {
@@ -27,7 +35,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -60,7 +68,6 @@ dependencies {
 
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-
 
     // Compose (BOM은 libs 사용 그대로)
     implementation(platform(libs.androidx.compose.bom))

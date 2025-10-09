@@ -26,7 +26,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
-        android:name=".App"
+        android:name=".core.App"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -38,7 +38,7 @@
         tools:targetApi="31">
         <!-- 런처: 권한 게이트 -->
         <activity
-            android:name=".PermissionActivity"
+            android:name=".ui.PermissionActivity"
             android:exported="true"
             android:noHistory="true"
             android:theme="@style/Theme.MedLinkDuo">
@@ -50,12 +50,12 @@
 
         <!-- 메인: 권한 통과 후에만 진입 -->
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:exported="false"
             android:theme="@style/Theme.MedLinkDuo" />
 
         <service
-            android:name=".service.BleKeepAliveService"
+            android:name=".data.ble.BleKeepAliveService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice"/>
     </application>

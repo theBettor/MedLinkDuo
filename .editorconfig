@@ -1,0 +1,19 @@
+root = true
+
+[*.{kt,kts}]
+ktlint_code_style = ktlint_official
+
+# (신규) 비활성화할 규칙
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_comment-in-code = disabled
+ktlint_standard_function-naming = disabled
+# 필요하면 파일명 규칙도 끌 수 있음
+# ktlint_standard_filename = disabled
+
+# 라인/개행/임포트 레이아웃
+max_line_length = 120
+insert_final_newline = true
+ij_kotlin_imports_layout = *,java.**,javax.**,kotlin.**,^
+
+# Compose/Preview 함수는 PascalCase 허용
+ktlint_function_naming_ignore_when_annotated_with = Composable,Preview
