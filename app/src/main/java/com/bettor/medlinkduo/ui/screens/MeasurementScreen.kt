@@ -1,9 +1,5 @@
 package com.bettor.medlinkduo.ui.screens
 
-import android.content.Intent
-import android.speech.RecognizerIntent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +16,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -37,7 +39,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.bettor.medlinkduo.core.common.Phase
 import com.bettor.medlinkduo.core.di.AppDepsEntryPoint
+import com.bettor.medlinkduo.core.ui.Command
 import com.bettor.medlinkduo.core.ui.HapticEvent
+import com.bettor.medlinkduo.core.ui.VoiceButton
 import com.bettor.medlinkduo.core.ui.a11yReReadGesture
 import com.bettor.medlinkduo.core.ui.minTouchTarget
 import com.bettor.medlinkduo.core.ui.play
@@ -47,7 +51,6 @@ import com.bettor.medlinkduo.core.ui.rememberPlatformHaptics
 import com.bettor.medlinkduo.ui.viewmodel.SessionViewModel
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -59,6 +62,7 @@ fun MeasurementScreen(
     val ctx = LocalContext.current
     val deps = remember { EntryPointAccessors.fromApplication(ctx, AppDepsEntryPoint::class.java) }
     val tts = deps.tts()
+    val sensory = deps.sensory()
     val speakNumeric = deps.speakNumeric()
 
     val last by vm.last.collectAsState()
@@ -86,21 +90,22 @@ fun MeasurementScreen(
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                // 👇 더블탭: 마지막 값 재낭독 / 롱프레스: 어디서든 ‘긴급 중단’
-                .a11yReReadGesture(
-                    onDoubleTap = {
-                        last?.let { scope.launch { speakNumeric(it) } }
-                        haptics.play(HapticEvent.ReRead)
-                    },
-                    onLongPress = {
-                        vm.pause()
-                        haptics.play(HapticEvent.SafeStop)
-                        tts.speak("측정을 중단했습니다.")
-                    },
-                )
-                .padding(20.dp),
+        Modifier
+            .fillMaxSize()
+            // 👇 더블탭: 마지막 값 재낭독 / 롱프레스: 어디서든 ‘긴급 중단’
+            .a11yReReadGesture(
+                onDoubleTap = {
+                    last?.let { scope.launch { speakNumeric(it) } }
+                    haptics.play(HapticEvent.ReRead)
+                },
+                onLongPress = {
+                    vm.pause()
+                    sensory.error()                    // 경고음
+                    haptics.play(HapticEvent.SafeStop)
+                    tts.speak("측정을 중단했습니다.")
+                },
+            )
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // 제목(heading)
@@ -123,9 +128,9 @@ fun MeasurementScreen(
                 text = last?.value ?: "측정 대기 중…",
                 style = MaterialTheme.typography.displaySmall,
                 modifier =
-                    Modifier
-                        .focusRequester(focusRequester)
-                        .focusable(),
+                Modifier
+                    .focusRequester(focusRequester)
+                    .focusable(),
             )
         }
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -148,12 +153,15 @@ fun MeasurementScreen(
                 onClick = {
                     guard.launch {
                         tts.speakAndWait("측정을 시작합니다.")
+                        sensory.tick()                 // 시작 알림(짧게)
                         haptics.play(HapticEvent.Connected, ph)
                         vm.remeasure()
                     }
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase != Phase.Measuring,
-                modifier = Modifier.minTouchTarget().semantics { role = Role.Button },
+                modifier = Modifier
+                    .minTouchTarget()
+                    .semantics { role = Role.Button },
             ) { Text("측정") }
 
             // 중단
@@ -161,12 +169,15 @@ fun MeasurementScreen(
                 onClick = {
                     guard.launch {
                         vm.pause()
+                        sensory.vibrate(60)            // 손에 확 느껴지게
                         haptics.play(HapticEvent.SafeStop, ph)
                         tts.speak("측정을 중단했습니다.")
                     }
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase == Phase.Measuring,
-                modifier = Modifier.minTouchTarget().semantics { role = Role.Button },
+                modifier = Modifier
+                    .minTouchTarget()
+                    .semantics { role = Role.Button },
             ) { Text("중단") }
 
             // 측정 종료 → Feedback
@@ -174,44 +185,34 @@ fun MeasurementScreen(
                 onClick = {
                     guard.launch {
                         vm.end()
+                        sensory.success()              // 완료 찰칵
                         haptics.play(HapticEvent.ScanDone, ph)
                         tts.speakAndWait("측정 결과를 보여드립니다.")
                         onShowFeedback()
                     }
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase != Phase.Idle,
-                modifier = Modifier.minTouchTarget().semantics { role = Role.Button },
+                modifier = Modifier
+                    .minTouchTarget()
+                    .semantics { role = Role.Button },
             ) { Text("측정 종료") }
 
-            // 음성명령
-            VoiceCommandButton(
-                onRepeat = { last?.let { m -> scope.launch { speakNumeric(m) } } },
-                onReMeasure = {
-                    guard.launch {
-                        tts.speakAndWait("측정을 시작합니다.")
-                        vm.remeasure()
+            // MeasurementScreen.kt - FlowRow 안의 기존 음성 버튼 자리에
+            VoiceButton(
+                allowed = setOf(Command.ReMeasure, Command.Pause, Command.End, Command.GoScan, Command.RepeatResult),
+                onCommand = { cmd ->
+                    when (cmd) {
+                        Command.ReMeasure -> scope.launch { tts.speakAndWait("측정을 시작합니다."); vm.remeasure() }
+                        Command.Pause -> {
+                            vm.pause(); tts.speak("측정을 중단했습니다.")
+                        }
+
+                        Command.End -> scope.launch { vm.end(); tts.speakAndWait("측정 결과를 보여드립니다."); onShowFeedback() }
+                        Command.GoScan -> scope.launch { vm.end(); tts.speakAndWait("기기 선택 화면으로 돌아갑니다."); onGoToScan() }
+                        Command.RepeatResult -> last?.let { scope.launch { speakNumeric(it) } }
+                        else -> Unit
                     }
-                },
-                onPause = {
-                    guard.launch {
-                        vm.pause()
-                        tts.speak("측정을 중단했습니다.")
-                    }
-                },
-                onEnd = {
-                    guard.launch {
-                        vm.end()
-                        tts.speakAndWait("측정 결과를 보여드립니다.")
-                        onShowFeedback()
-                    }
-                },
-                onGoScan = {
-                    guard.launch {
-                        vm.end()
-                        tts.speakAndWait("기기 선택 화면으로 돌아갑니다.")
-                        onGoToScan()
-                    }
-                },
+                }
             )
 
             // 기기 선택 화면으로
@@ -224,55 +225,10 @@ fun MeasurementScreen(
                     }
                 },
                 enabled = !guard.acting,
-                modifier = Modifier.minTouchTarget().semantics { role = Role.Button },
+                modifier = Modifier
+                    .minTouchTarget()
+                    .semantics { role = Role.Button },
             ) { Text("기기 선택 화면으로") }
         }
-    }
-}
-
-@Composable
-fun VoiceCommandButton(
-    onRepeat: () -> Unit,
-    onReMeasure: () -> Unit,
-    onPause: () -> Unit,
-    onEnd: () -> Unit,
-    onGoScan: () -> Unit,
-) {
-    val launcher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.StartActivityForResult(),
-        ) { res ->
-            val text =
-                res.data
-                    ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                    ?.firstOrNull()
-                    ?.lowercase(Locale.getDefault())
-                    ?: return@rememberLauncherForActivityResult
-
-            when {
-                listOf("다시", "다시 읽어줘", "repeat", "read").any { it in text } -> onRepeat()
-                listOf("측정", "측정", "remeasure").any { it in text } -> onReMeasure()
-                listOf("중단", "pause", "멈춰").any { it in text } -> onPause()
-                listOf("종료", "측정 종료", "end").any { it in text } -> onEnd()
-                listOf("스캔", "기기 선택", "scan").any { it in text } -> onGoScan()
-            }
-        }
-
-    val intent =
-        remember {
-            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(
-                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
-                )
-                putExtra(
-                    RecognizerIntent.EXTRA_PROMPT,
-                    "명령을 말하세요: 측정, 중단, 측정 종료, 기기 선택, 다시 읽어줘",
-                )
-            }
-        }
-
-    OutlinedButton(onClick = { launcher.launch(intent) }) {
-        Text("음성명령")
     }
 }

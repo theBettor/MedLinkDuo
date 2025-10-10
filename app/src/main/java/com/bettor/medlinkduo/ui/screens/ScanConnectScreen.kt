@@ -2,11 +2,26 @@ package com.bettor.medlinkduo.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Divider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -22,7 +37,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.bettor.medlinkduo.core.di.AppDepsEntryPoint
+import com.bettor.medlinkduo.core.ui.Command
 import com.bettor.medlinkduo.core.ui.HapticEvent
+import com.bettor.medlinkduo.core.ui.VoiceButton
 import com.bettor.medlinkduo.core.ui.a11yClickable
 import com.bettor.medlinkduo.core.ui.a11yReReadGesture
 import com.bettor.medlinkduo.core.ui.minTouchTarget
@@ -48,6 +65,7 @@ fun ScanConnectScreen(
     val ctx = LocalContext.current
     val deps = remember { EntryPointAccessors.fromApplication(ctx, AppDepsEntryPoint::class.java) }
     val tts = deps.tts()
+    val sensory = deps.sensory()       // ← 이거 한 줄만 추가
 
     // 🔔 Haptics
     val haptics = rememberHaptics()
@@ -95,6 +113,21 @@ fun ScanConnectScreen(
         }
     }
 
+    // 상태 전이마다 1회
+    LaunchedEffect(phase) {
+        when (phase) {
+            "Scanning" -> sensory.tick()     // 스캔 시작
+            "Done" -> sensory.success()  // 스캔 완료
+        }
+    }
+    LaunchedEffect(state) {
+        when (state) {
+            is ConnectionState.Synced -> sensory.success() // 연결 성공
+            is ConnectionState.Disconnected -> sensory.error()   // 끊김/오류
+            else -> Unit
+        }
+    }
+
     // 상태 텍스트(Idle은 노출하지 않음)
     val status =
         when {
@@ -106,26 +139,26 @@ fun ScanConnectScreen(
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                // 👇 더블탭: 상태 재낭독 / 롱프레스: 간단 도움말
-                .a11yReReadGesture(
-                    onDoubleTap = {
-                        val statusSpoken =
-                            when (phase) {
-                                "Scanning" -> "주변 기기를 찾는 중입니다"
-                                "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
-                                else -> if (state is ConnectionState.Synced) "연결됨" else "대기 중"
-                            }
-                        tts.speak(statusSpoken)
-                        haptics.play(HapticEvent.ReRead)
-                    },
-                    onLongPress = {
-                        tts.speak("재스캔은 화면 중앙의 버튼입니다.")
-                        haptics.play(HapticEvent.SafeStop)
-                    },
-                )
-                .padding(20.dp),
+        Modifier
+            .fillMaxSize()
+            // 👇 더블탭: 상태 재낭독 / 롱프레스: 간단 도움말
+            .a11yReReadGesture(
+                onDoubleTap = {
+                    val statusSpoken =
+                        when (phase) {
+                            "Scanning" -> "주변 기기를 찾는 중입니다"
+                            "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
+                            else -> if (state is ConnectionState.Synced) "연결됨" else "대기 중"
+                        }
+                    tts.speak(statusSpoken)
+                    haptics.play(HapticEvent.ReRead)
+                },
+                onLongPress = {
+                    tts.speak("재스캔은 화면 중앙의 버튼입니다.")
+                    haptics.play(HapticEvent.SafeStop)
+                },
+            )
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // 제목(heading) — TalkBack 구조 인식 향상
@@ -142,9 +175,9 @@ fun ScanConnectScreen(
             text = status,
             style = MaterialTheme.typography.headlineMedium,
             modifier =
-                Modifier
-                    .focusRequester(focusRequester)
-                    .focusable(),
+            Modifier
+                .focusRequester(focusRequester)
+                .focusable(),
         )
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -156,15 +189,37 @@ fun ScanConnectScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Button(
-                onClick = { vm.onScan() },
+                onClick = { sensory.tick(); vm.onScan() },
                 modifier =
-                    Modifier
-                        .minTouchTarget()
-                        .semantics { role = Role.Button },
+                Modifier
+                    .minTouchTarget()
+                    .semantics { role = Role.Button },
             ) { Text("재스캔") }
         }
 
         Spacer(Modifier.height(20.dp))
+
+        // ScanConnectScreen.kt - 재스캔 버튼 아래 등 원하는 위치
+        VoiceButton(
+            allowed = setOf(Command.Rescan, Command.RepeatResult, Command.GoScan),
+            onCommand = { cmd ->
+                when (cmd) {
+                    Command.Rescan -> vm.onScan()
+                    Command.RepeatResult -> /* 현재 상태 말하기 */ tts.speak(
+                        when (status) {
+                            "Scanning" -> "주변 기기를 찾는 중입니다"
+                            "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
+                            else -> status
+                        }
+                    )
+
+                    Command.GoScan -> { /* 현재 화면이므로 무시 or 도움말 */
+                    }
+
+                    else -> Unit
+                }
+            }
+        )
 
         // 장치 리스트(최대 2개)
         LazyColumn(Modifier.weight(1f)) {

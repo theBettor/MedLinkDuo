@@ -9,7 +9,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 
 class SensoryFeedback(private val ctx: Context) {
-    private val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+    private val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
 
     fun tick() {
         tone.startTone(ToneGenerator.TONE_PROP_BEEP, 80)

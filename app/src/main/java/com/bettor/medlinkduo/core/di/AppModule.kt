@@ -2,6 +2,7 @@ package com.bettor.medlinkduo.core.di
 
 import android.content.Context
 import androidx.work.WorkManager
+import com.bettor.medlinkduo.core.ui.SensoryFeedback
 import com.bettor.medlinkduo.data.ble.MockBleRepository
 import com.bettor.medlinkduo.data.prefs.OnboardingStore
 import com.bettor.medlinkduo.data.tts.AndroidTtsController
@@ -26,28 +27,38 @@ object AppModule {
     @Singleton
     fun appScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    @Provides @Singleton
+    @Provides
+    @Singleton
     fun bleRepo(
         @ApplicationContext ctx: Context,
         scope: CoroutineScope,
     ): BleRepository = MockBleRepository(ctx, scope)
 
-    @Provides @Singleton
+    @Provides
+    @Singleton
     fun provideTts(
         @ApplicationContext ctx: Context,
     ): TtsController = AndroidTtsController(ctx)
 
     // DataStore 기반의 온보딩/플래그 저장소 (필요할 때만 사용)
-    @Provides @Singleton
+    @Provides
+    @Singleton
     fun onboardingStore(
         @ApplicationContext ctx: Context,
     ): OnboardingStore = OnboardingStore(ctx)
+
+    @Provides
+    @Singleton
+    fun sensory(
+        @ApplicationContext ctx: Context,
+    ): SensoryFeedback = SensoryFeedback(ctx)
 }
 
 @Module
 @InstallIn(SingletonComponent::class)
 object WorkModule {
-    @Provides @Singleton
+    @Provides
+    @Singleton
     fun provideWorkManager(
         @ApplicationContext ctx: Context,
     ): WorkManager = WorkManager.getInstance(ctx)
@@ -61,4 +72,6 @@ interface AppDepsEntryPoint {
     fun onboardingStore(): OnboardingStore
 
     fun speakNumeric(): SpeakMeasurementNumericUseCase
+
+    fun sensory(): SensoryFeedback
 }
