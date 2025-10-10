@@ -23,7 +23,6 @@
     <!-- Android 14+ 연결 장치 유형 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
 
-    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".core.App"
