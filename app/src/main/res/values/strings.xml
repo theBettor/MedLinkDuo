@@ -1,3 +1,26 @@
 <resources>
     <string name="app_name">MedLinkDuo</string>
+
+    <!-- ScanConnect -->
+    <string name="scan_title">기기 선택</string>
+    <string name="scan_btn_rescan">재스캔</string>
+    <string name="scan_device_rssi_dbm">RSSI %1$d dBm</string>
+    <string name="scan_device_connect_label">연결</string>
+    <string name="scan_device_desc">장치 %1$s, 신호 %2$d</string>
+    <string name="scan_device_connect_label">연결</string>
+
+    <!-- Measurement -->
+    <string name="measurement_title">측정</string>
+    <string name="measurement_waiting">측정 대기 중…</string>
+    <string name="measurement_btn_start">측정</string>
+    <string name="measurement_btn_pause">중단</string>
+    <string name="measurement_btn_end">측정 종료</string>
+
+    <!-- Feedback -->
+    <string name="feedback_title">세션 요약</string>
+    <string name="feedback_last_value">마지막 측정값: %1$s</string>
+    <string name="feedback_no_value">측정값이 없습니다.</string>
+
+    <!-- Common / Nav -->
+    <string name="nav_go_to_scan">기기 선택 화면으로</string>
 </resources>

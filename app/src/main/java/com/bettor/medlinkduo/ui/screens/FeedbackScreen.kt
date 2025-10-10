@@ -25,12 +25,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.bettor.medlinkduo.R
+import com.bettor.medlinkduo.R.string.feedback_last_value
+import com.bettor.medlinkduo.R.string.feedback_no_value
+import com.bettor.medlinkduo.R.string.feedback_title
+import com.bettor.medlinkduo.R.string.nav_go_to_scan
 import com.bettor.medlinkduo.core.di.AppDepsEntryPoint
 import com.bettor.medlinkduo.core.ui.HapticEvent
 import com.bettor.medlinkduo.core.ui.a11yReReadGesture
@@ -77,36 +83,36 @@ fun FeedbackScreen(
     // 🔽 아래 UI는 “기존 디자인”에 맞춰 바꿔 넣어도 됨
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                // 더블탭: 마지막 값 재낭독 / 롱프레스: 피드백 닫기
-                .a11yReReadGesture(
-                    onDoubleTap = {
-                        last?.let {
-                            scope.launch { speakNumeric(it) }
-                            haptics.play(HapticEvent.ReRead, ph) // 👈 넘겨도 OK
-                        }
-                    },
-                    onLongPress = {
-                        scope.launch {
-                            haptics.play(HapticEvent.SafeStop, ph) // 👈 긴급 종료 느낌
-                            tts.speakAndWait("피드백 화면을 닫습니다.")
-                            onGoToScan()
-                        }
-                    },
-                )
-                .padding(20.dp),
+        Modifier
+            .fillMaxSize()
+            // 더블탭: 마지막 값 재낭독 / 롱프레스: 피드백 닫기
+            .a11yReReadGesture(
+                onDoubleTap = {
+                    last?.let {
+                        scope.launch { speakNumeric(it) }
+                        haptics.play(HapticEvent.ReRead, ph) // 👈 넘겨도 OK
+                    }
+                },
+                onLongPress = {
+                    scope.launch {
+                        haptics.play(HapticEvent.SafeStop, ph) // 👈 긴급 종료 느낌
+                        tts.speakAndWait("피드백 화면을 닫습니다.")
+                        onGoToScan()
+                    }
+                },
+            )
+            .padding(20.dp),
         horizontalAlignment = Alignment.Start,
     ) {
         // 제목: heading 지정 + 첫 포커스 진입점
         Text(
-            "세션 요약",
+            stringResource(feedback_title),
             style = MaterialTheme.typography.headlineMedium,
             modifier =
-                Modifier
-                    .semantics { heading() }
-                    .focusRequester(focusRequester)
-                    .focusable(),
+            Modifier
+                .semantics { heading() }
+                .focusRequester(focusRequester)
+                .focusable(),
         )
 
         Spacer(Modifier.height(12.dp))
@@ -119,7 +125,10 @@ fun FeedbackScreen(
                     .border(2.dp, MaterialTheme.colorScheme.onBackground)
                     .padding(16.dp),
         ) {
-            val line = summary?.last?.let { "마지막 측정값: ${it.value}" } ?: "측정값이 없습니다."
+            val line = summary?.last?.let {
+                stringResource(feedback_last_value, it.value) // value가 String이 아니라면 toString() 사용
+            } ?: stringResource(feedback_no_value)
+
             Text(line, textAlign = TextAlign.Start, style = MaterialTheme.typography.titleLarge)
         }
 
@@ -135,7 +144,7 @@ fun FeedbackScreen(
                     }
                 },
                 modifier = Modifier.minTouchTarget().semantics { role = Role.Button },
-            ) { Text("기기 선택 화면으로") }
+            ) { Text(stringResource(nav_go_to_scan)) }
         }
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
@@ -36,6 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.bettor.medlinkduo.R
+import com.bettor.medlinkduo.R.string.scan_btn_rescan
+import com.bettor.medlinkduo.R.string.scan_device_connect_label
+import com.bettor.medlinkduo.R.string.scan_title
 import com.bettor.medlinkduo.core.di.AppDepsEntryPoint
 import com.bettor.medlinkduo.core.ui.Command
 import com.bettor.medlinkduo.core.ui.HapticEvent
@@ -139,31 +144,31 @@ fun ScanConnectScreen(
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                // 👇 더블탭: 상태 재낭독 / 롱프레스: 간단 도움말
-                .a11yReReadGesture(
-                    onDoubleTap = {
-                        val statusSpoken =
-                            when (phase) {
-                                "Scanning" -> "주변 기기를 찾는 중입니다"
-                                "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
-                                else -> if (state is ConnectionState.Synced) "연결됨" else "대기 중"
-                            }
-                        tts.speak(statusSpoken)
-                        haptics.play(HapticEvent.ReRead)
-                    },
-                    onLongPress = {
-                        tts.speak("재스캔은 화면 중앙의 버튼입니다.")
-                        haptics.play(HapticEvent.SafeStop)
-                    },
-                )
-                .padding(20.dp),
+        Modifier
+            .fillMaxSize()
+            // 👇 더블탭: 상태 재낭독 / 롱프레스: 간단 도움말
+            .a11yReReadGesture(
+                onDoubleTap = {
+                    val statusSpoken =
+                        when (phase) {
+                            "Scanning" -> "주변 기기를 찾는 중입니다"
+                            "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
+                            else -> if (state is ConnectionState.Synced) "연결됨" else "대기 중"
+                        }
+                    tts.speak(statusSpoken)
+                    haptics.play(HapticEvent.ReRead)
+                },
+                onLongPress = {
+                    tts.speak("재스캔은 화면 중앙의 버튼입니다.")
+                    haptics.play(HapticEvent.SafeStop)
+                },
+            )
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // 제목(heading) — TalkBack 구조 인식 향상
         Text(
-            "기기 선택",
+            stringResource(scan_title),
             modifier = Modifier.semantics { heading() },
             style = MaterialTheme.typography.titleLarge,
         )
@@ -175,9 +180,9 @@ fun ScanConnectScreen(
             text = status,
             style = MaterialTheme.typography.headlineMedium,
             modifier =
-                Modifier
-                    .focusRequester(focusRequester)
-                    .focusable(),
+            Modifier
+                .focusRequester(focusRequester)
+                .focusable(),
         )
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -194,10 +199,10 @@ fun ScanConnectScreen(
                     vm.onScan()
                 },
                 modifier =
-                    Modifier
-                        .minTouchTarget()
-                        .semantics { role = Role.Button },
-            ) { Text("재스캔") }
+                Modifier
+                    .minTouchTarget()
+                    .semantics { role = Role.Button },
+            ) { stringResource(scan_btn_rescan) }
         }
 
         Spacer(Modifier.height(20.dp))
@@ -244,8 +249,12 @@ private fun DeviceRow(
         Modifier
             .fillMaxWidth()
             .a11yClickable(
-                desc = "장치 ${d.name ?: d.id}, 신호 ${d.rssi}",
-                label = "연결",
+                desc = stringResource(
+                    R.string.scan_device_desc,
+                    d.name ?: d.id,   // %1$s
+                    d.rssi            // %2$d
+                ),
+                label = stringResource(scan_device_connect_label),
             ) { onClick() }
             .clickable { onClick() }
             .padding(vertical = 12.dp, horizontal = 8.dp),
@@ -253,7 +262,10 @@ private fun DeviceRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(d.name ?: d.id, style = MaterialTheme.typography.titleMedium)
-            Text("RSSI ${d.rssi}", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = stringResource(R.string.scan_device_rssi_dbm, d.rssi),
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }
