@@ -89,6 +89,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    lint {
+        checkOnly += setOf("UnusedDeclaration", "UnusedResources")
+        abortOnError = false    // 리포트만 보고 싶으면
+    }
 }
 
 dependencies {
