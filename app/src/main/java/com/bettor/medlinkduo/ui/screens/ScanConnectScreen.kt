@@ -144,26 +144,26 @@ fun ScanConnectScreen(
 
     Column(
         modifier =
-        Modifier
-            .fillMaxSize()
-            // 👇 더블탭: 상태 재낭독 / 롱프레스: 간단 도움말
-            .a11yReReadGesture(
-                onDoubleTap = {
-                    val statusSpoken =
-                        when (phase) {
-                            "Scanning" -> "주변 기기를 찾는 중입니다"
-                            "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
-                            else -> if (state is ConnectionState.Synced) "연결됨" else "대기 중"
-                        }
-                    tts.speak(statusSpoken)
-                    haptics.play(HapticEvent.ReRead)
-                },
-                onLongPress = {
-                    tts.speak("재스캔은 화면 중앙의 버튼입니다.")
-                    haptics.play(HapticEvent.SafeStop)
-                },
-            )
-            .padding(20.dp),
+            Modifier
+                .fillMaxSize()
+                // 👇 더블탭: 상태 재낭독 / 롱프레스: 간단 도움말
+                .a11yReReadGesture(
+                    onDoubleTap = {
+                        val statusSpoken =
+                            when (phase) {
+                                "Scanning" -> "주변 기기를 찾는 중입니다"
+                                "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
+                                else -> if (state is ConnectionState.Synced) "연결됨" else "대기 중"
+                            }
+                        tts.speak(statusSpoken)
+                        haptics.play(HapticEvent.ReRead)
+                    },
+                    onLongPress = {
+                        tts.speak("재스캔은 화면 중앙의 버튼입니다.")
+                        haptics.play(HapticEvent.SafeStop)
+                    },
+                )
+                .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // 제목(heading) — TalkBack 구조 인식 향상
@@ -180,9 +180,9 @@ fun ScanConnectScreen(
             text = status,
             style = MaterialTheme.typography.headlineMedium,
             modifier =
-            Modifier
-                .focusRequester(focusRequester)
-                .focusable(),
+                Modifier
+                    .focusRequester(focusRequester)
+                    .focusable(),
         )
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -199,9 +199,9 @@ fun ScanConnectScreen(
                     vm.onScan()
                 },
                 modifier =
-                Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { stringResource(scan_btn_rescan) }
         }
 
@@ -249,11 +249,12 @@ private fun DeviceRow(
         Modifier
             .fillMaxWidth()
             .a11yClickable(
-                desc = stringResource(
-                    R.string.scan_device_desc,
-                    d.name ?: d.id,   // %1$s
-                    d.rssi            // %2$d
-                ),
+                desc =
+                    stringResource(
+                        R.string.scan_device_desc,
+                        d.name ?: d.id, // %1$s
+                        d.rssi, // %2$d
+                    ),
                 label = stringResource(scan_device_connect_label),
             ) { onClick() }
             .clickable { onClick() }
@@ -264,7 +265,7 @@ private fun DeviceRow(
             Text(d.name ?: d.id, style = MaterialTheme.typography.titleMedium)
             Text(
                 text = stringResource(R.string.scan_device_rssi_dbm, d.rssi),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }

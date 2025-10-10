@@ -32,7 +32,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.bettor.medlinkduo.R
 import com.bettor.medlinkduo.R.string.feedback_last_value
 import com.bettor.medlinkduo.R.string.feedback_no_value
 import com.bettor.medlinkduo.R.string.feedback_title
@@ -83,25 +82,25 @@ fun FeedbackScreen(
     // 🔽 아래 UI는 “기존 디자인”에 맞춰 바꿔 넣어도 됨
     Column(
         modifier =
-        Modifier
-            .fillMaxSize()
-            // 더블탭: 마지막 값 재낭독 / 롱프레스: 피드백 닫기
-            .a11yReReadGesture(
-                onDoubleTap = {
-                    last?.let {
-                        scope.launch { speakNumeric(it) }
-                        haptics.play(HapticEvent.ReRead, ph) // 👈 넘겨도 OK
-                    }
-                },
-                onLongPress = {
-                    scope.launch {
-                        haptics.play(HapticEvent.SafeStop, ph) // 👈 긴급 종료 느낌
-                        tts.speakAndWait("피드백 화면을 닫습니다.")
-                        onGoToScan()
-                    }
-                },
-            )
-            .padding(20.dp),
+            Modifier
+                .fillMaxSize()
+                // 더블탭: 마지막 값 재낭독 / 롱프레스: 피드백 닫기
+                .a11yReReadGesture(
+                    onDoubleTap = {
+                        last?.let {
+                            scope.launch { speakNumeric(it) }
+                            haptics.play(HapticEvent.ReRead, ph) // 👈 넘겨도 OK
+                        }
+                    },
+                    onLongPress = {
+                        scope.launch {
+                            haptics.play(HapticEvent.SafeStop, ph) // 👈 긴급 종료 느낌
+                            tts.speakAndWait("피드백 화면을 닫습니다.")
+                            onGoToScan()
+                        }
+                    },
+                )
+                .padding(20.dp),
         horizontalAlignment = Alignment.Start,
     ) {
         // 제목: heading 지정 + 첫 포커스 진입점
@@ -109,10 +108,10 @@ fun FeedbackScreen(
             stringResource(feedback_title),
             style = MaterialTheme.typography.headlineMedium,
             modifier =
-            Modifier
-                .semantics { heading() }
-                .focusRequester(focusRequester)
-                .focusable(),
+                Modifier
+                    .semantics { heading() }
+                    .focusRequester(focusRequester)
+                    .focusable(),
         )
 
         Spacer(Modifier.height(12.dp))
@@ -125,9 +124,10 @@ fun FeedbackScreen(
                     .border(2.dp, MaterialTheme.colorScheme.onBackground)
                     .padding(16.dp),
         ) {
-            val line = summary?.last?.let {
-                stringResource(feedback_last_value, it.value) // value가 String이 아니라면 toString() 사용
-            } ?: stringResource(feedback_no_value)
+            val line =
+                summary?.last?.let {
+                    stringResource(feedback_last_value, it.value) // value가 String이 아니라면 toString() 사용
+                } ?: stringResource(feedback_no_value)
 
             Text(line, textAlign = TextAlign.Start, style = MaterialTheme.typography.titleLarge)
         }

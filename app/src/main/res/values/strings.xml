@@ -7,7 +7,6 @@
     <string name="scan_device_rssi_dbm">RSSI %1$d dBm</string>
     <string name="scan_device_connect_label">연결</string>
     <string name="scan_device_desc">장치 %1$s, 신호 %2$d</string>
-    <string name="scan_device_connect_label">연결</string>
 
     <!-- Measurement -->
     <string name="measurement_title">측정</string>

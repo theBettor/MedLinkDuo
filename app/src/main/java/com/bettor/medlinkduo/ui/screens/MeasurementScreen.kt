@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.bettor.medlinkduo.R
 import com.bettor.medlinkduo.R.string.measurement_btn_end
 import com.bettor.medlinkduo.R.string.measurement_btn_pause
 import com.bettor.medlinkduo.R.string.measurement_btn_start
@@ -98,22 +97,22 @@ fun MeasurementScreen(
 
     Column(
         modifier =
-        Modifier
-            .fillMaxSize()
-            // 👇 더블탭: 마지막 값 재낭독 / 롱프레스: 어디서든 ‘긴급 중단’
-            .a11yReReadGesture(
-                onDoubleTap = {
-                    last?.let { scope.launch { speakNumeric(it) } }
-                    haptics.play(HapticEvent.ReRead)
-                },
-                onLongPress = {
-                    vm.pause()
-                    sensory.error() // 경고음
-                    haptics.play(HapticEvent.SafeStop)
-                    tts.speak("측정을 중단했습니다.")
-                },
-            )
-            .padding(20.dp),
+            Modifier
+                .fillMaxSize()
+                // 👇 더블탭: 마지막 값 재낭독 / 롱프레스: 어디서든 ‘긴급 중단’
+                .a11yReReadGesture(
+                    onDoubleTap = {
+                        last?.let { scope.launch { speakNumeric(it) } }
+                        haptics.play(HapticEvent.ReRead)
+                    },
+                    onLongPress = {
+                        vm.pause()
+                        sensory.error() // 경고음
+                        haptics.play(HapticEvent.SafeStop)
+                        tts.speak("측정을 중단했습니다.")
+                    },
+                )
+                .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // 제목(heading)
@@ -136,9 +135,9 @@ fun MeasurementScreen(
                 text = last?.value ?: stringResource(measurement_waiting),
                 style = MaterialTheme.typography.displaySmall,
                 modifier =
-                Modifier
-                    .focusRequester(focusRequester)
-                    .focusable(),
+                    Modifier
+                        .focusRequester(focusRequester)
+                        .focusable(),
             )
         }
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -168,9 +167,9 @@ fun MeasurementScreen(
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase != Phase.Measuring,
                 modifier =
-                Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { Text(stringResource(measurement_btn_start)) }
 
             // 중단
@@ -185,9 +184,9 @@ fun MeasurementScreen(
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase == Phase.Measuring,
                 modifier =
-                Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { Text(stringResource(measurement_btn_pause)) }
 
             // 측정 종료 → Feedback
@@ -203,9 +202,9 @@ fun MeasurementScreen(
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase != Phase.Idle,
                 modifier =
-                Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { Text(stringResource(measurement_btn_end)) }
 
             // MeasurementScreen.kt - FlowRow 안의 기존 음성 버튼 자리에
@@ -252,9 +251,9 @@ fun MeasurementScreen(
                 },
                 enabled = !guard.acting,
                 modifier =
-                Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { Text(stringResource(nav_go_to_scan)) }
         }
     }
