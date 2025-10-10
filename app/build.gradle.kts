@@ -4,7 +4,39 @@ plugins {
     id("org.jetbrains.kotlin.kapt")
     id("com.google.dagger.hilt.android")
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
+    id("io.gitlab.arturbosch.detekt")
 }
+
+detekt {
+    // Detekt 기본 설정 위에 내 설정을 덮어씀
+    buildUponDefaultConfig = true
+    allRules = false        // 불필요한 실험/구식 룰은 끔
+    parallel = true
+
+    // 커스텀 룰 구성 파일(바로 아래 3단계에서 생성)
+    config = files("$rootDir/detekt.yml")
+
+    source = files(
+        "src/main/java",
+        "src/test/java",
+        "src/androidTest/java"
+    )
+
+    // 리포트 (원하는 형식만 true)
+    reports {
+        html.required.set(true)
+        xml.required.set(false)
+        txt.required.set(false)
+        sarif.required.set(false)
+        md.required.set(false)
+    }
+}
+
+// ⚠️ ktlint와 중복되는 formatting 룰을 detekt로까지 검사하려면 아래를 추가.
+// (우리는 포맷은 ktlint로만 하기로 했으니 "굳이" 필요 없음)
+// dependencies {
+//     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.6")
+// }
 
 android {
     namespace = "com.bettor.medlinkduo"

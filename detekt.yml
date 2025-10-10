@@ -1,0 +1,54 @@
+build:
+  maxIssues: 0
+
+config:
+  validation: true
+
+processors:
+  active: true
+
+console-reports:
+  active: true
+
+potential-bugs:
+  active: true
+
+style:
+  active: true
+
+  MagicNumber:
+    active: true
+    ignorePropertyDeclaration: true
+    ignoreAnnotation: true
+    ignoreEnums: true
+    ignoreCompanionObjectPropertyDeclaration: true
+
+  MaxLineLength:
+    active: true
+    maxLineLength: 120
+    excludePackageStatements: true
+    excludeImportStatements: true
+    excludeCommentStatements: false
+
+  WildcardImport:
+    active: false  # 포맷은 ktlint가 담당
+
+  # ✅ 미사용 private 멤버/파라미터 잡기
+  UnusedPrivateMember:
+    active: true
+    ignoreAnnotated:
+      - Composable
+      - Preview
+
+  UnusedParameter:
+    active: true
+    allowedNames: '_|ignored|unused'
+
+naming:
+  active: true
+
+  FunctionNaming:
+    active: true
+    ignoreAnnotated:
+      - Composable
+      - Preview
