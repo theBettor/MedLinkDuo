@@ -148,6 +148,15 @@ fun MeasurementScreen(
         val ui by vm.ui.collectAsState()
         val guard = rememberActionGuard(scope) // ← 한 줄로 가드 준비
 
+        // ✅ 새 측정값 들어올 때 자동 숫자 낭독 (측정 중일 때만)
+        LaunchedEffect(last?.ts, ui.phase) {
+            val m = last ?: return@LaunchedEffect
+            if (ui.phase == Phase.Measuring) {
+                // LaunchedEffect는 suspend 컨텍스트라 직접 호출 가능
+                speakNumeric(m) // 숫자만 (예: "120")
+            }
+        }
+
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
             modifier = Modifier.fillMaxWidth(),

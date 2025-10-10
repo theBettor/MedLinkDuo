@@ -11,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,6 +26,9 @@ class AndroidTtsController
     ) : TtsController {
         private val ready = CompletableDeferred<Unit>()
         private val waiters = mutableMapOf<String, (Result<Unit>) -> Unit>()
+
+        // 중단을 구분하기 위한 내부 예외
+        private object TtsStopped : CancellationException("TTS stopped")
 
         // 오디오 포커스 관리(중복 요청 안전)
         private val audioFocus = AudioFocusManager(ctx)
@@ -78,7 +82,8 @@ class AndroidTtsController
                         utteranceId: String?,
                         interrupted: Boolean,
                     ) {
-                        utteranceId?.let { waiters.remove(it)?.invoke(Result.failure(RuntimeException("TTS stopped"))) }
+                        // ⬇️ '중단'은 정상 흐름으로 전달(나중에 swallow)
+                        utteranceId?.let { waiters.remove(it)?.invoke(Result.failure(TtsStopped)) }
                         abandonFocus() // ✅ stop 시도 반납
                     }
                 },
@@ -110,22 +115,31 @@ class AndroidTtsController
 
             requestFocus() // ✅ 대기형 발화도 시작 전에 포커스 획득
             try {
-                val result =
-                    suspendCancellableCoroutine { cont ->
-                        waiters[id] = { r -> if (cont.isActive) cont.resume(r) }
-                        cont.invokeOnCancellation {
-                            waiters.remove(id)
-                            runCatching { tts.stop() }
-                        }
-                        val code = tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, id)
-                        if (code != TextToSpeech.SUCCESS) {
-                            waiters.remove(id)
-                            cont.resumeWithException(IllegalStateException("speak failed: $code"))
-                        }
+                // 결과를 받아 '중단'만 정상 종료로 치환
+                val result: Result<Unit> = suspendCancellableCoroutine { cont ->
+                    waiters[id] = { r -> if (cont.isActive) cont.resume(r) }
+
+                    cont.invokeOnCancellation {
+                        waiters.remove(id)
+                        runCatching { tts.stop() }
                     }
-                result.getOrThrow()
+
+                    val code = tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, id)
+                    if (code != TextToSpeech.SUCCESS) {
+                        waiters.remove(id)
+                        cont.resumeWithException(IllegalStateException("speak failed: $code"))
+                    }
+                }
+
+                result.fold(
+                    onSuccess = { /* ok */ },
+                    onFailure = { e ->
+                        // 'stop()'으로 끊긴 경우는 정상 종료로 간주(throw 하지 않음)
+                        if (e !is TtsStopped) throw e
+                    }
+                )
             } finally {
-                // onDone/onError/onStop에서도 반납하지만, 예외·조기종료 대비 이중보장(Ref-count로 안전)
+                // onDone/onStop에서도 반납하지만, 예외/조기종료에 대비해 이중보장(Ref-count라 중복 안전)
                 abandonFocus()
             }
         }

@@ -24,17 +24,22 @@ class SensoryFeedback(private val ctx: Context) {
     }
 
     fun vibrate(ms: Long = 40) {
-        val vib: Vibrator =
-            if (Build.VERSION.SDK_INT >= 31) {
-                (ctx.getSystemService(VibratorManager::class.java)).defaultVibrator
+        runCatching {
+            val vib: Vibrator =
+                if (Build.VERSION.SDK_INT >= 31) {
+                    (ctx.getSystemService(VibratorManager::class.java)).defaultVibrator
+                } else {
+                    ctx.getSystemService(Vibrator::class.java)
+                }
+            if (Build.VERSION.SDK_INT >= 26) {
+                vib.vibrate(VibrationEffect.createOneShot(ms, 160))
             } else {
-                ctx.getSystemService(Vibrator::class.java)
+                @Suppress("DEPRECATION")
+                vib.vibrate(ms)
             }
-        if (Build.VERSION.SDK_INT >= 26) {
-            vib.vibrate(VibrationEffect.createOneShot(ms, 160))
-        } else {
-            @Suppress("DEPRECATION")
-            vib.vibrate(ms)
+        }.onFailure {
+            // 선택: 로그만 남기고 무시하거나, Compose 하프틱으로 폴백하도록 설계해도 됨
+            // Timber.w(it, "vibrate failed; falling back to UI haptics")
         }
     }
 }
