@@ -54,7 +54,7 @@ class PermissionActivity : ComponentActivity() {
                 if (PermissionMgr.allGranted(ctx)) {
                     goMain()
                 } else {
-                    tts.speak("시스템 권한 창이 열렸습니다. 허용 버튼을 두 번 탭해 주세요.")
+                    tts.speak("시스템 권한 창이 열렸습니다. 허용을 위해 화면을 두 번 탭해 주세요.")
                     launcher.launch(PermissionMgr.required())
                 }
             }

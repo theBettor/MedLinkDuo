@@ -70,11 +70,11 @@ fun PermissionGate(onAllGranted: () -> Unit) {
             if (onboarding.shouldSpeak()) {
                 tts.speak(
                     "환영합니다. 이 앱은 화면 없이도 사용할 수 있도록 설계되었습니다. " +
-                        "지금 시스템 권한 창이 열리면, 허용 버튼을 두 번 탭해 주세요.",
+                        "지금 시스템 권한 창이 열리면, 허용을 위해 화면을 두 번 탭해 주세요.",
                 )
                 onboarding.markSpoken()
             } else {
-                tts.speak("시스템 권한 창이 열립니다. 허용 버튼을 두 번 탭해 주세요.")
+                tts.speak("시스템 권한 창이 열립니다. 허용을 위해 화면을 두 번 탭해 주세요.")
             }
             sensory.tick() // 👈 권한 다이얼로그 뜨기 직전 짧은 피드백
             launcher.launch(required)
@@ -122,7 +122,7 @@ fun PermissionGate(onAllGranted: () -> Unit) {
                             activity.startActivity(PermissionMgr.appSettingsIntent(activity))
                         } else {
                             sensory.tick() // 👈 재요청 전 피드백
-                            tts.speak("권한을 다시 요청합니다. 허용 버튼을 두 번 탭해 주세요.")
+                            tts.speak("권한을 다시 요청합니다. 허용을 위해 화면을 두 번 탭해 주세요.")
                             launcher.launch(required)
                         }
                         true
@@ -135,7 +135,7 @@ fun PermissionGate(onAllGranted: () -> Unit) {
                         activity.startActivity(PermissionMgr.appSettingsIntent(activity))
                     } else {
                         sensory.tick()
-                        tts.speak("권한을 다시 요청합니다. 허용 버튼을 두 번 탭해 주세요.")
+                        tts.speak("권한을 다시 요청합니다. 허용을 위해 화면을 두 번 탭해 주세요.")
                         launcher.launch(required)
                     }
                 },
