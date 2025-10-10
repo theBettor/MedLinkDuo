@@ -46,7 +46,6 @@ class MainActivity : ComponentActivity() {
                         onAllGranted = {
                             nav.navigate("scan") { popUpTo("perm") { inclusive = true } }
                         },
-                        onCancel = { finish() },
                     )
                 }
                 composable("scan") {

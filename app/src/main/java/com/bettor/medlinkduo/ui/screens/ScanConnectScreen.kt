@@ -65,7 +65,7 @@ fun ScanConnectScreen(
     val ctx = LocalContext.current
     val deps = remember { EntryPointAccessors.fromApplication(ctx, AppDepsEntryPoint::class.java) }
     val tts = deps.tts()
-    val sensory = deps.sensory()       // ← 이거 한 줄만 추가
+    val sensory = deps.sensory() // ← 이거 한 줄만 추가
 
     // 🔔 Haptics
     val haptics = rememberHaptics()
@@ -116,14 +116,14 @@ fun ScanConnectScreen(
     // 상태 전이마다 1회
     LaunchedEffect(phase) {
         when (phase) {
-            "Scanning" -> sensory.tick()     // 스캔 시작
-            "Done" -> sensory.success()  // 스캔 완료
+            "Scanning" -> sensory.tick() // 스캔 시작
+            "Done" -> sensory.success() // 스캔 완료
         }
     }
     LaunchedEffect(state) {
         when (state) {
             is ConnectionState.Synced -> sensory.success() // 연결 성공
-            is ConnectionState.Disconnected -> sensory.error()   // 끊김/오류
+            is ConnectionState.Disconnected -> sensory.error() // 끊김/오류
             else -> Unit
         }
     }
@@ -139,26 +139,26 @@ fun ScanConnectScreen(
 
     Column(
         modifier =
-        Modifier
-            .fillMaxSize()
-            // 👇 더블탭: 상태 재낭독 / 롱프레스: 간단 도움말
-            .a11yReReadGesture(
-                onDoubleTap = {
-                    val statusSpoken =
-                        when (phase) {
-                            "Scanning" -> "주변 기기를 찾는 중입니다"
-                            "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
-                            else -> if (state is ConnectionState.Synced) "연결됨" else "대기 중"
-                        }
-                    tts.speak(statusSpoken)
-                    haptics.play(HapticEvent.ReRead)
-                },
-                onLongPress = {
-                    tts.speak("재스캔은 화면 중앙의 버튼입니다.")
-                    haptics.play(HapticEvent.SafeStop)
-                },
-            )
-            .padding(20.dp),
+            Modifier
+                .fillMaxSize()
+                // 👇 더블탭: 상태 재낭독 / 롱프레스: 간단 도움말
+                .a11yReReadGesture(
+                    onDoubleTap = {
+                        val statusSpoken =
+                            when (phase) {
+                                "Scanning" -> "주변 기기를 찾는 중입니다"
+                                "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
+                                else -> if (state is ConnectionState.Synced) "연결됨" else "대기 중"
+                            }
+                        tts.speak(statusSpoken)
+                        haptics.play(HapticEvent.ReRead)
+                    },
+                    onLongPress = {
+                        tts.speak("재스캔은 화면 중앙의 버튼입니다.")
+                        haptics.play(HapticEvent.SafeStop)
+                    },
+                )
+                .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // 제목(heading) — TalkBack 구조 인식 향상
@@ -175,9 +175,9 @@ fun ScanConnectScreen(
             text = status,
             style = MaterialTheme.typography.headlineMedium,
             modifier =
-            Modifier
-                .focusRequester(focusRequester)
-                .focusable(),
+                Modifier
+                    .focusRequester(focusRequester)
+                    .focusable(),
         )
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -189,11 +189,14 @@ fun ScanConnectScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Button(
-                onClick = { sensory.tick(); vm.onScan() },
+                onClick = {
+                    sensory.tick()
+                    vm.onScan()
+                },
                 modifier =
-                Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { Text("재스캔") }
         }
 
@@ -205,20 +208,21 @@ fun ScanConnectScreen(
             onCommand = { cmd ->
                 when (cmd) {
                     Command.Rescan -> vm.onScan()
-                    Command.RepeatResult -> /* 현재 상태 말하기 */ tts.speak(
-                        when (status) {
-                            "Scanning" -> "주변 기기를 찾는 중입니다"
-                            "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
-                            else -> status
-                        }
-                    )
+                    Command.RepeatResult -> // 현재 상태 말하기
+                        tts.speak(
+                            when (status) {
+                                "Scanning" -> "주변 기기를 찾는 중입니다"
+                                "Done" -> "스캔이 완료되었습니다. 기기를 선택하세요"
+                                else -> status
+                            },
+                        )
 
-                    Command.GoScan -> { /* 현재 화면이므로 무시 or 도움말 */
+                    Command.GoScan -> { // 현재 화면이므로 무시 or 도움말
                     }
 
                     else -> Unit
                 }
-            }
+            },
         )
 
         // 장치 리스트(최대 2개)

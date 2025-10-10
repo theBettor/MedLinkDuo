@@ -90,22 +90,22 @@ fun MeasurementScreen(
 
     Column(
         modifier =
-        Modifier
-            .fillMaxSize()
-            // 👇 더블탭: 마지막 값 재낭독 / 롱프레스: 어디서든 ‘긴급 중단’
-            .a11yReReadGesture(
-                onDoubleTap = {
-                    last?.let { scope.launch { speakNumeric(it) } }
-                    haptics.play(HapticEvent.ReRead)
-                },
-                onLongPress = {
-                    vm.pause()
-                    sensory.error()                    // 경고음
-                    haptics.play(HapticEvent.SafeStop)
-                    tts.speak("측정을 중단했습니다.")
-                },
-            )
-            .padding(20.dp),
+            Modifier
+                .fillMaxSize()
+                // 👇 더블탭: 마지막 값 재낭독 / 롱프레스: 어디서든 ‘긴급 중단’
+                .a11yReReadGesture(
+                    onDoubleTap = {
+                        last?.let { scope.launch { speakNumeric(it) } }
+                        haptics.play(HapticEvent.ReRead)
+                    },
+                    onLongPress = {
+                        vm.pause()
+                        sensory.error() // 경고음
+                        haptics.play(HapticEvent.SafeStop)
+                        tts.speak("측정을 중단했습니다.")
+                    },
+                )
+                .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // 제목(heading)
@@ -128,9 +128,9 @@ fun MeasurementScreen(
                 text = last?.value ?: "측정 대기 중…",
                 style = MaterialTheme.typography.displaySmall,
                 modifier =
-                Modifier
-                    .focusRequester(focusRequester)
-                    .focusable(),
+                    Modifier
+                        .focusRequester(focusRequester)
+                        .focusable(),
             )
         }
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -153,15 +153,16 @@ fun MeasurementScreen(
                 onClick = {
                     guard.launch {
                         tts.speakAndWait("측정을 시작합니다.")
-                        sensory.tick()                 // 시작 알림(짧게)
+                        sensory.tick() // 시작 알림(짧게)
                         haptics.play(HapticEvent.Connected, ph)
                         vm.remeasure()
                     }
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase != Phase.Measuring,
-                modifier = Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                modifier =
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { Text("측정") }
 
             // 중단
@@ -169,15 +170,16 @@ fun MeasurementScreen(
                 onClick = {
                     guard.launch {
                         vm.pause()
-                        sensory.vibrate(60)            // 손에 확 느껴지게
+                        sensory.vibrate(60) // 손에 확 느껴지게
                         haptics.play(HapticEvent.SafeStop, ph)
                         tts.speak("측정을 중단했습니다.")
                     }
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase == Phase.Measuring,
-                modifier = Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                modifier =
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { Text("중단") }
 
             // 측정 종료 → Feedback
@@ -185,16 +187,17 @@ fun MeasurementScreen(
                 onClick = {
                     guard.launch {
                         vm.end()
-                        sensory.success()              // 완료 찰칵
+                        sensory.success() // 완료 찰칵
                         haptics.play(HapticEvent.ScanDone, ph)
                         tts.speakAndWait("측정 결과를 보여드립니다.")
                         onShowFeedback()
                     }
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase != Phase.Idle,
-                modifier = Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                modifier =
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { Text("측정 종료") }
 
             // MeasurementScreen.kt - FlowRow 안의 기존 음성 버튼 자리에
@@ -202,17 +205,32 @@ fun MeasurementScreen(
                 allowed = setOf(Command.ReMeasure, Command.Pause, Command.End, Command.GoScan, Command.RepeatResult),
                 onCommand = { cmd ->
                     when (cmd) {
-                        Command.ReMeasure -> scope.launch { tts.speakAndWait("측정을 시작합니다."); vm.remeasure() }
+                        Command.ReMeasure ->
+                            scope.launch {
+                                tts.speakAndWait("측정을 시작합니다.")
+                                vm.remeasure()
+                            }
                         Command.Pause -> {
-                            vm.pause(); tts.speak("측정을 중단했습니다.")
+                            vm.pause()
+                            tts.speak("측정을 중단했습니다.")
                         }
 
-                        Command.End -> scope.launch { vm.end(); tts.speakAndWait("측정 결과를 보여드립니다."); onShowFeedback() }
-                        Command.GoScan -> scope.launch { vm.end(); tts.speakAndWait("기기 선택 화면으로 돌아갑니다."); onGoToScan() }
+                        Command.End ->
+                            scope.launch {
+                                vm.end()
+                                tts.speakAndWait("측정 결과를 보여드립니다.")
+                                onShowFeedback()
+                            }
+                        Command.GoScan ->
+                            scope.launch {
+                                vm.end()
+                                tts.speakAndWait("기기 선택 화면으로 돌아갑니다.")
+                                onGoToScan()
+                            }
                         Command.RepeatResult -> last?.let { scope.launch { speakNumeric(it) } }
                         else -> Unit
                     }
-                }
+                },
             )
 
             // 기기 선택 화면으로
@@ -225,9 +243,10 @@ fun MeasurementScreen(
                     }
                 },
                 enabled = !guard.acting,
-                modifier = Modifier
-                    .minTouchTarget()
-                    .semantics { role = Role.Button },
+                modifier =
+                    Modifier
+                        .minTouchTarget()
+                        .semantics { role = Role.Button },
             ) { Text("기기 선택 화면으로") }
         }
     }
