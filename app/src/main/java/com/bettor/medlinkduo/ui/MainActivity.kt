@@ -5,12 +5,8 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -79,33 +75,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun Greeting(
-    name: String,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier,
-    )
-}
-
-fun NavController.goToScan() {
-    val popped =
-        try {
-            popBackStack(route = "scan", inclusive = false)
-        } catch (_: Throwable) {
-            false
-        }
-    if (!popped) {
-        navigate("scan") {
-            popUpTo(graph.startDestinationId) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
         }
     }
 }

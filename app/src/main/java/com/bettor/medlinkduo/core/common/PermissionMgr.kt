@@ -39,7 +39,7 @@ object PermissionMgr {
     }
 
     /** 아직 허용되지 않은 권한들만 반환 */
-    fun missing(context: Context): Array<String> {
+    private fun missing(context: Context): Array<String> {
         val need = required()
         val miss = java.util.ArrayList<String>(need.size)
         for (p in need) {
@@ -52,7 +52,7 @@ object PermissionMgr {
     /** 전부 허용되었는지 (확장함수 isEmpty() 대신 size 비교) */
     fun allGranted(context: Context): Boolean {
         val m = missing(context)
-        return m.size == 0
+        return m.isEmpty()
     }
 
     /** 라쇼날(다시 묻기 설명) 필요한 권한이 하나라도 있는지 */

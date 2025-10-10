@@ -1,11 +1,10 @@
 package com.bettor.medlinkduo.data.ble
 
-import android.content.Context
+import com.bettor.medlinkduo.core.di.AppScope
 import com.bettor.medlinkduo.domain.BleDevice
 import com.bettor.medlinkduo.domain.BleRepository
 import com.bettor.medlinkduo.domain.ConnectionState
 import com.bettor.medlinkduo.domain.Measurement
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,8 +24,7 @@ import javax.inject.Singleton
 class MockBleRepository
     @Inject
     constructor(
-        @ApplicationContext private val context: Context,
-        private val scope: CoroutineScope,
+        @AppScope private val scope: CoroutineScope,
     ) : BleRepository {
         private val state = MutableStateFlow<ConnectionState>(ConnectionState.Idle)
         override val connectionState: StateFlow<ConnectionState> = state

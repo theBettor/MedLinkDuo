@@ -14,14 +14,15 @@ class ActionGuard(
     private var _acting by mutableStateOf(false)
     val acting: Boolean get() = _acting
 
+    /** 재진입 방지 + 코루틴 스코프에서 실행 */
     fun launch(block: suspend () -> Unit) {
-        if (acting) return
-        acting = true
+        if (_acting) return
+        _acting = true
         scope.launch {
             try {
                 block()
             } finally {
-                acting = false
+                _acting = false
             }
         }
     }

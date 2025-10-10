@@ -18,37 +18,38 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class AppScope
 
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
     @Provides
     @Singleton
+    @AppScope
     fun appScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Provides
     @Singleton
     fun bleRepo(
-        @ApplicationContext ctx: Context,
-        scope: CoroutineScope,
-    ): BleRepository = MockBleRepository(ctx, scope)
+        @AppScope scope: CoroutineScope,
+    ): BleRepository = MockBleRepository(scope)
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideTts(
         @ApplicationContext ctx: Context,
     ): TtsController = AndroidTtsController(ctx)
 
-    // DataStore 기반의 온보딩/플래그 저장소 (필요할 때만 사용)
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun onboardingStore(
         @ApplicationContext ctx: Context,
     ): OnboardingStore = OnboardingStore(ctx)
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun sensory(
         @ApplicationContext ctx: Context,
     ): SensoryFeedback = SensoryFeedback(ctx)

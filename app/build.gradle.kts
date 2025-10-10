@@ -10,17 +10,18 @@ plugins {
 detekt {
     // Detekt 기본 설정 위에 내 설정을 덮어씀
     buildUponDefaultConfig = true
-    allRules = false        // 불필요한 실험/구식 룰은 끔
+    allRules = false // 불필요한 실험/구식 룰은 끔
     parallel = true
 
     // 커스텀 룰 구성 파일(바로 아래 3단계에서 생성)
     config = files("$rootDir/detekt.yml")
 
-    source = files(
-        "src/main/java",
-        "src/test/java",
-        "src/androidTest/java"
-    )
+    source =
+        files(
+            "src/main/java",
+            "src/test/java",
+            "src/androidTest/java",
+        )
 
     // 리포트 (원하는 형식만 true)
     reports {
@@ -92,7 +93,7 @@ android {
 
     lint {
         checkOnly += setOf("UnusedDeclaration", "UnusedResources")
-        abortOnError = false    // 리포트만 보고 싶으면
+        abortOnError = false // 리포트만 보고 싶으면
     }
 }
 

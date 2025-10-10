@@ -55,7 +55,6 @@ private fun parseCommand(text: String): Command? =
 fun VoiceButton(
     onCommand: (Command) -> Unit,
     allowed: Set<Command>? = null,
-    prompt: String = "명령을 말하세요: 재스캔, 다시 읽어줘, 측정, 중단, 측정 종료, 기기 선택",
 ) {
     val ctx = LocalContext.current
     val activity = ctx as Activity
