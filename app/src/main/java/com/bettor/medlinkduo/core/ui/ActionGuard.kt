@@ -11,8 +11,8 @@ import kotlinx.coroutines.launch
 class ActionGuard(
     private val scope: CoroutineScope,
 ) {
-    var acting by mutableStateOf(false)
-        private set
+    private var _acting by mutableStateOf(false)
+    val acting: Boolean get() = _acting
 
     fun launch(block: suspend () -> Unit) {
         if (acting) return
