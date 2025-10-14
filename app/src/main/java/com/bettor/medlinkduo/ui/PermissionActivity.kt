@@ -1,7 +1,7 @@
 package com.bettor.medlinkduo.ui
 
-import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,108 +10,180 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
+import androidx.core.content.ContextCompat
 import com.bettor.medlinkduo.core.common.PermissionMgr
 import com.bettor.medlinkduo.core.di.AppDepsEntryPoint
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class PermissionActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 이미 허용이면 바로 메인
+        if (PermissionMgr.allGranted(this)) {
+            goMain()
+            return
+        }
+
         setContent {
             val ctx = LocalContext.current
-            val activity = ctx as Activity
-            val tts =
-                remember {
-                    EntryPointAccessors.fromApplication(ctx, AppDepsEntryPoint::class.java).tts()
-                }
-            var launchedOnce by remember { mutableStateOf(false) }
+            val deps = remember { EntryPointAccessors.fromApplication(ctx, AppDepsEntryPoint::class.java) }
+            val tts = deps.tts()
+            val sensory = deps.sensory()
+            val scope = rememberCoroutineScope()
 
-            // 권한 요청 런처
+            // 진행 상태
+            var completed by rememberSaveable { mutableStateOf(false) } // 메인 전환 1회 보장
+            var inFlight by rememberSaveable { mutableStateOf(false) } // 시스템 대화상자 요청 중
+            var permanentlyDenied by rememberSaveable { mutableStateOf(false) } // OS가 더 이상 대화상자 안 띄움(‘다시 묻지 않기’)
+
+            // 현재 시점에 ‘미허용’ 권한만 계산
+            fun currentMissing(): Array<String> =
+                PermissionMgr.required()
+                    .filter { p -> ContextCompat.checkSelfPermission(ctx, p) != PERMISSION_GRANTED }
+                    .toTypedArray()
+
+            // 영구 거부 여부
+            fun isPermanentlyDenied(): Boolean = PermissionMgr.isPermanentlyDenied(this@PermissionActivity)
+
+            // 결과 런처
             val launcher =
                 rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions(),
-                ) { result ->
-                    val all = result.values.all { it }
-                    if (all) {
-                        goMain()
+                ) { _ ->
+                    inFlight = false
+                    val stillMissing = currentMissing().isNotEmpty()
+                    if (!stillMissing) {
+                        if (!completed) {
+                            sensory.success()
+                            tts.speak("권한이 허용되었습니다.")
+                            completed = true
+                            goMain()
+                        }
                     } else {
-                        launchedOnce = true
+                        // 거부됨
+                        sensory.error()
+                        permanentlyDenied = isPermanentlyDenied()
+
+                        if (permanentlyDenied) {
+                            // OS가 더 이상 창을 안 띄움 → 재요청 막고 안내만
+                            scope.launch {
+                                tts.speakAndWait(
+                                    "권한이 여러 차례 거부되어 허용 창을 더 이상 열 수 없습니다. " +
+                                        "주변의 도움을 받아 앱 설정에서 권한을 켜주세요..",
+                                )
+                            }
+                        } else {
+                            // 소프트 거부 → 단일 탭으로 언제든 재요청 가능
+                            scope.launch {
+                                tts.speakAndWait(
+                                    "권한이 허용되지 않았습니다. 주변의 도움을 받아 권한을 켜 주세요. " +
+                                        "화면을 한번 탭하면 허용 창이 열립니다.",
+                                )
+                            }
+                        }
                     }
                 }
 
-            // 최초 진입: OK면 바로 Main, 아니면 자동 요청
-            LaunchedEffect(Unit) {
-                if (PermissionMgr.allGranted(ctx)) {
+            // 시스템 권한 대화상자 실행
+            fun launchPermissionDialog() {
+                if (completed || inFlight || permanentlyDenied) return
+
+                val toAsk = currentMissing()
+
+                // 권한을 물어볼 항목이 있을 때만 런처 호출
+                if (toAsk.isNotEmpty()) {
+                    inFlight = true
+                    sensory.tick()
+                    launcher.launch(toAsk)
+                    return
+                }
+
+                // 더 물어볼 게 없으면 바로 메인으로
+                if (!completed) {
+                    completed = true
                     goMain()
-                } else {
-                    tts.speak("시스템 권한 창이 열렸습니다. 허용을 위해 화면을 두 번 탭해 주세요.")
-                    launcher.launch(PermissionMgr.required())
                 }
             }
 
-            // 다시 묻지 않기라 창을 못 띄울 때 → 설정 이동
-            val mustGoSettings =
-                launchedOnce &&
-                    !PermissionMgr.shouldShowAnyRationale(activity) &&
-                    !PermissionMgr.allGranted(ctx)
+            // 최초 진입: 짧게 안내하고 바로 시스템 대화상자 오픈
+            LaunchedEffect(Unit) {
+                if (!PermissionMgr.allGranted(ctx)) {
+                    tts.speak("권한 요청 창이 곧 열립니다. 확인 버튼을 눌러 주세요.")
+                    launchPermissionDialog()
+                }
+            }
 
-            // 설정 갔다가 복귀하면 onResume에서 재검사
-
-            // 빈 화면 전체를 큰 버튼처럼 사용(두 번 탭 제스처 대응)
+            // UI: 단일 탭만 사용
+            val canRetry = !completed && !inFlight && !permanentlyDenied
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
                         .semantics {
                             contentDescription =
-                                if (mustGoSettings) {
-                                    "권한이 차단되었습니다. 화면을 두 번 탭하면 설정을 엽니다."
+                                if (permanentlyDenied) {
+                                    "권한이 여러 차례 거부되어 허용 창을 더 이상 열 수 없습니다. " +
+                                        "주변의 도움을 받아 앱 설정에서 권한을 켜주세요.."
                                 } else {
-                                    "화면을 두 번 탭하면 권한을 다시 요청합니다."
+                                    "화면을 한번 탭하면 권한을 다시 요청합니다."
                                 }
-                            onClick(label = if (mustGoSettings) "설정 열기" else "권한 다시 요청") {
-                                if (mustGoSettings) {
-                                    tts.speak("설정을 엽니다. 권한에서 블루투스를 허용해 주세요.")
-                                    startActivity(PermissionMgr.appSettingsIntent(activity))
+                            onClick(label = if (permanentlyDenied) "안내" else "권한 다시 요청") {
+                                if (permanentlyDenied) {
+                                    // 재요청 불가 상태: 멘트만 반복
+                                    tts.speak(
+                                        "권한이 여러 차례 거부되어 허용 창을 더 이상 열 수 없습니다. " +
+                                            "주변의 도움을 받아 앱 설정에서 권한을 켜주세요..",
+                                    )
                                 } else {
-                                    tts.speak("권한을 다시 요청합니다. 허용을 두 번 탭해 주세요.")
-                                    launcher.launch(PermissionMgr.required())
+                                    launchPermissionDialog()
                                 }
                                 true
                             }
                         }
                         .clickable {
-                            if (mustGoSettings) {
-                                tts.speak("설정을 엽니다. 권한에서 블루투스를 허용해 주세요.")
-                                startActivity(PermissionMgr.appSettingsIntent(activity))
+                            if (permanentlyDenied) {
+                                tts.speak(
+                                    "권한이 여러 차례 거부되어 허용 창을 더 이상 열 수 없습니다. " +
+                                        "주변의 도움을 받아 앱 설정에서 권한을 켜주세요..",
+                                )
                             } else {
-                                tts.speak("권한을 다시 요청합니다. 허용을 두 번 탭해 주세요.")
-                                launcher.launch(PermissionMgr.required())
+                                launchPermissionDialog()
                             }
                         },
                 contentAlignment = Alignment.Center,
-            ) { /* 시각요소 없음 */ }
+            ) { /* 시각 요소 없음(빈 화면) */ }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        // 설정에서 돌아온 경우 포함: 권한 OK면 곧바로 Main
+        // 대화상자에서 돌아와 이미 허용됐다면 바로 메인으로
         if (PermissionMgr.allGranted(this)) goMain()
     }
 
     private fun goMain() {
-        startActivity(Intent(this, MainActivity::class.java))
+        startActivity(
+            Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            },
+        )
         finish()
     }
 }

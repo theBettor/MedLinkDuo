@@ -1,5 +1,6 @@
 package com.bettor.medlinkduo.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import com.bettor.medlinkduo.R.string.measurement_btn_end
 import com.bettor.medlinkduo.R.string.measurement_btn_pause
 import com.bettor.medlinkduo.R.string.measurement_btn_start
@@ -49,14 +51,16 @@ import com.bettor.medlinkduo.core.di.AppDepsEntryPoint
 import com.bettor.medlinkduo.core.ui.Command
 import com.bettor.medlinkduo.core.ui.HapticEvent
 import com.bettor.medlinkduo.core.ui.VoiceButton
-import com.bettor.medlinkduo.core.ui.a11yReReadGesture
+import com.bettor.medlinkduo.core.ui.a11yGestures
 import com.bettor.medlinkduo.core.ui.minTouchTarget
 import com.bettor.medlinkduo.core.ui.play
 import com.bettor.medlinkduo.core.ui.rememberActionGuard
 import com.bettor.medlinkduo.core.ui.rememberHaptics
 import com.bettor.medlinkduo.core.ui.rememberPlatformHaptics
+import com.bettor.medlinkduo.core.ui.rememberVoiceCommandLauncher
 import com.bettor.medlinkduo.ui.viewmodel.SessionViewModel
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -73,15 +77,42 @@ fun MeasurementScreen(
     val speakNumeric = deps.speakNumeric()
 
     val last by vm.last.collectAsState()
-    val scope = rememberCoroutineScope()
+    val ui by vm.ui.collectAsState()
 
+    val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     val ph = rememberPlatformHaptics() // ← 추가: 플랫폼 파형
 
     // 첫 포커스(중앙 값)
     val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    // 화면 벗어나면 즉시 정지
+    // 음성 명령: 더블탭 → 음성 / 롱프레스 → 긴급 중단
+    val launchVoice =
+        rememberVoiceCommandLauncher(
+            allowed = setOf(Command.ReMeasure, Command.Pause, Command.End, Command.GoScan),
+            onCommand = { cmd ->
+                when (cmd) {
+                    Command.ReMeasure -> vm.remeasure()
+                    Command.Pause -> {
+                        vm.pause()
+                        sensory.error()
+                        haptics.play(HapticEvent.SafeStop, ph)
+                    }
+                    Command.End -> {
+                        vm.end()
+                        onShowFeedback()
+                    }
+                    Command.GoScan -> {
+                        vm.end()
+                        onGoToScan()
+                    }
+                    else -> Unit
+                }
+            },
+        )
+
+    // 화면 벗어나면 즉시 정지 (ON_PAUSE)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val obs =
@@ -89,10 +120,26 @@ fun MeasurementScreen(
                 if (e == Lifecycle.Event.ON_PAUSE) vm.pause()
             }
         lifecycleOwner.lifecycle.addObserver(obs)
-        onDispose {
-            vm.pause()
-            lifecycleOwner.lifecycle.removeObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+
+    // RESUMED 상태에서만 새 측정값 숫자 낭독(측정 중일 때)
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            combine(vm.last, vm.ui) { m, u -> m to u.phase }.collect { (m, phase) ->
+                if (phase == Phase.Measuring && m != null) {
+                    // suspend 안전 구간
+                    speakNumeric(m) // 예: "120"
+                }
+            }
         }
+    }
+
+    // MeasurementScreen 내부 어딘가(Composable 최상단 근처)
+    BackHandler(enabled = true) {
+        // 뒤로가기 무시 + 선택: 경고음/안내
+        sensory.error()
+        tts.speak("현재 화면에서는 뒤로가기가 지원되지 않습니다.")
     }
 
     Column(
@@ -100,15 +147,12 @@ fun MeasurementScreen(
             Modifier
                 .fillMaxSize()
                 // 👇 더블탭: 마지막 값 재낭독 / 롱프레스: 어디서든 ‘긴급 중단’
-                .a11yReReadGesture(
-                    onDoubleTap = {
-                        last?.let { scope.launch { speakNumeric(it) } }
-                        haptics.play(HapticEvent.ReRead)
-                    },
-                    onLongPress = {
+                .a11yGestures(
+                    onDoubleTap = { launchVoice() }, // ✅ 공통: 더블탭=음성
+                    onLongPress = { // ✅ 안전: 롱프레스=긴급중단
                         vm.pause()
-                        sensory.error() // 경고음
-                        haptics.play(HapticEvent.SafeStop)
+                        sensory.error()
+                        haptics.play(HapticEvent.SafeStop, ph)
                         tts.speak("측정을 중단했습니다.")
                     },
                 )
@@ -140,22 +184,10 @@ fun MeasurementScreen(
                         .focusable(),
             )
         }
-        LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
         Spacer(Modifier.height(20.dp))
 
-        // 상단 state 구독 + 가드 플래그 추가
-        val ui by vm.ui.collectAsState()
         val guard = rememberActionGuard(scope) // ← 한 줄로 가드 준비
-
-        // ✅ 새 측정값 들어올 때 자동 숫자 낭독 (측정 중일 때만)
-        LaunchedEffect(last?.ts, ui.phase) {
-            val m = last ?: return@LaunchedEffect
-            if (ui.phase == Phase.Measuring) {
-                // LaunchedEffect는 suspend 컨텍스트라 직접 호출 가능
-                speakNumeric(m) // 숫자만 (예: "120")
-            }
-        }
 
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
@@ -216,7 +248,6 @@ fun MeasurementScreen(
                         .semantics { role = Role.Button },
             ) { Text(stringResource(measurement_btn_end)) }
 
-            // MeasurementScreen.kt - FlowRow 안의 기존 음성 버튼 자리에
             VoiceButton(
                 allowed = setOf(Command.ReMeasure, Command.Pause, Command.End, Command.GoScan, Command.RepeatResult),
                 onCommand = { cmd ->
@@ -226,6 +257,7 @@ fun MeasurementScreen(
                                 tts.speakAndWait("측정을 시작합니다.")
                                 vm.remeasure()
                             }
+
                         Command.Pause -> {
                             vm.pause()
                             tts.speak("측정을 중단했습니다.")
@@ -237,12 +269,14 @@ fun MeasurementScreen(
                                 tts.speakAndWait("측정 결과를 보여드립니다.")
                                 onShowFeedback()
                             }
+
                         Command.GoScan ->
                             scope.launch {
                                 vm.end()
                                 tts.speakAndWait("기기 선택 화면으로 돌아갑니다.")
                                 onGoToScan()
                             }
+
                         Command.RepeatResult -> last?.let { scope.launch { speakNumeric(it) } }
                         else -> Unit
                     }

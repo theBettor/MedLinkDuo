@@ -4,11 +4,9 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 /**
@@ -55,20 +53,10 @@ object PermissionMgr {
         return m.isEmpty()
     }
 
-    /** 라쇼날(다시 묻기 설명) 필요한 권한이 하나라도 있는지 */
-    fun shouldShowAnyRationale(activity: Activity): Boolean {
-        val need = required()
-        for (p in need) {
-            if (activity.shouldShowRequestPermissionRationale(p)) return true
-        }
-        return false
-    }
-
-    /** 앱 설정 화면으로 이동 Intent (권한 영구거부 안내용) */
-    fun appSettingsIntent(context: Context): Intent {
-        return Intent(
-            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.fromParts("package", context.packageName, null),
-        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    /** 시스템이 더는 다이얼로그를 띄워주지 않는 상태(= 사실상 자동 차단) */
+    fun isPermanentlyDenied(activity: Activity): Boolean {
+        val miss = missing(activity)
+        if (miss.isEmpty()) return false
+        return miss.any { !ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }
     }
 }

@@ -31,20 +31,61 @@ sealed class Command {
 
     data object GoScan : Command()
 
-    data object OpenFeedback : Command()
+    companion object {
+        val all: Set<Command> = setOf(Rescan, ReMeasure, Pause, End, GoScan)
+    }
 }
 
-private fun parseCommand(text: String): Command? =
+// 한국어/영어 간단 파서
+fun parseCommand(text: String): Command? =
     when {
-        listOf("재스캔", "다시 스캔", "스캔", "scan").any { it in text } -> Command.Rescan
-        listOf("다시 읽어줘", "다시", "읽어 줘", "repeat", "read").any { it in text } -> Command.RepeatResult
-        listOf("측정", "시작", "remeasure", "measure").any { it in text } -> Command.ReMeasure
-        listOf("중단", "멈춰", "pause", "stop").any { it in text } -> Command.Pause
-        listOf("종료", "측정 종료", "end", "finish").any { it in text } -> Command.End
-        listOf("기기 선택", "스캔 화면", "스캔으로", "go scan").any { it in text } -> Command.GoScan
-        listOf("피드백", "의견").any { it in text } -> Command.OpenFeedback
+        // 스캔
+        listOf("재스캔", "다시 스캔", "스캔", "scan", "rescan").any { it in text } -> Command.Rescan
+        // 측정
+        listOf("측정", "시작", "start", "remeasure").any { it in text } -> Command.ReMeasure
+        // 중단
+        listOf("중단", "멈춰", "stop", "pause").any { it in text } -> Command.Pause
+        // 종료
+        listOf("종료", "끝", "완료", "end", "finish").any { it in text } -> Command.End
+        // 스캔 화면으로
+        listOf("스캔으로", "기기 선택", "scan", "go to scan").any { it in text } -> Command.GoScan
         else -> null
     }
+
+/**
+ * 더블탭 제스처로 호출할 음성 명령 런처를 준비해주는 헬퍼.
+ * 사용: val launchVoice = rememberVoiceCommandLauncher(allowed = setOf(...)) { cmd -> ... }
+ * 그 다음 .a11yGestures(onDoubleTap = { launchVoice() }) 로 연결.
+ */
+@Composable
+fun rememberVoiceCommandLauncher(
+    allowed: Set<Command> = Command.all,
+    onCommand: (Command) -> Unit,
+    onUnknown: () -> Unit = {},
+): () -> Unit {
+    val launcher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) { res ->
+            val results = res.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val text =
+                results?.firstOrNull()?.lowercase(
+                    Locale.getDefault(),
+                ) ?: return@rememberLauncherForActivityResult
+            val cmd = parseCommand(text)
+            if (cmd != null && allowed.contains(cmd)) onCommand(cmd) else onUnknown()
+        }
+
+    val intent =
+        remember {
+            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "명령을 말하세요")
+            }
+        }
+
+    return { launcher.launch(intent) }
+}
 
 /**
  * 공용 음성 명령 버튼.

@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.work.WorkManager
 import com.bettor.medlinkduo.core.ui.SensoryFeedback
 import com.bettor.medlinkduo.data.ble.MockBleRepository
-import com.bettor.medlinkduo.data.prefs.OnboardingStore
 import com.bettor.medlinkduo.data.tts.AndroidTtsController
 import com.bettor.medlinkduo.domain.BleRepository
 import com.bettor.medlinkduo.domain.SpeakMeasurementNumericUseCase
@@ -45,11 +44,6 @@ object AppModule {
     ): TtsController = AndroidTtsController(ctx)
 
     @Provides @Singleton
-    fun onboardingStore(
-        @ApplicationContext ctx: Context,
-    ): OnboardingStore = OnboardingStore(ctx)
-
-    @Provides @Singleton
     fun sensory(
         @ApplicationContext ctx: Context,
     ): SensoryFeedback = SensoryFeedback(ctx)
@@ -69,8 +63,6 @@ object WorkModule {
 @InstallIn(SingletonComponent::class)
 interface AppDepsEntryPoint {
     fun tts(): TtsController
-
-    fun onboardingStore(): OnboardingStore
 
     fun speakNumeric(): SpeakMeasurementNumericUseCase
 

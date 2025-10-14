@@ -65,24 +65,18 @@ class ConnectViewModel
             }
         }
 
-        fun onScan() {
-            if (_scanPhase.value == "Scanning") return
-            scanJob?.cancel()
-            scanJob =
-                viewModelScope.launch {
-                    _scanPhase.value = "Scanning"
-                    // 스캔 시작 안내는 끊지 않고 붙여도 되지만, 겹침 방지를 위해 대기 없이 한 줄만
-                    say("주변 기기를 찾는 중입니다", await = false)
-                    try {
-                        repo.scan().collect { list -> _devices.value = list }
-                    } finally {
-                        _scanPhase.value = "Done"
-                        if (connection.value !is ConnectionState.Synced) {
-                            say("스캔이 완료되었습니다. 원하시는 기기를 선택하여 주십시오.", await = true)
-                        }
-                    }
-                }
+    fun onScan() {
+        if (_scanPhase.value == "Scanning") return
+        scanJob?.cancel()
+        scanJob = viewModelScope.launch {
+            _scanPhase.value = "Scanning"
+            try {
+                repo.scan().collect { list -> _devices.value = list }
+            } finally {
+                _scanPhase.value = "Done"
+            }
         }
+    }
 
         fun onConnect(d: BleDevice) = viewModelScope.launch { repo.connect(d) }
 

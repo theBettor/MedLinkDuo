@@ -25,14 +25,14 @@ fun Modifier.a11yClickable(
     }
 
 @SuppressLint("ModifierFactoryUnreferencedReceiver")
-fun Modifier.a11yReReadGesture(
-    onDoubleTap: () -> Unit,
-    onLongPress: () -> Unit,
+fun Modifier.a11yGestures(
+    onDoubleTap: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
 ): Modifier =
-    pointerInput(Unit) {
+    pointerInput(onDoubleTap, onLongPress) {
         detectTapGestures(
-            onDoubleTap = { onDoubleTap() },
-            onLongPress = { onLongPress() },
+            onDoubleTap = { onDoubleTap?.invoke() },
+            onLongPress = { onLongPress?.invoke() },
         )
     }
 
