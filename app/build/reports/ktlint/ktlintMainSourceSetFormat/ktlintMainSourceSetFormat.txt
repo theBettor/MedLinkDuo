@@ -1,0 +1,4 @@
+[90m/Users/changyokim/Desktop/MedLinkDuo/app/src/main/java/com/bettor/medlinkduo/data/tts/[0mAndroidTtsController.kt[90m:[0m35[90m:1:[0m Unexpected indentation (4) (should be 8) [90m(standard:indent)[0m
+
+Summary error count (descending) by rule:
+  standard:indent: 1

@@ -1,0 +1,8 @@
+[90m/Users/changyokim/Desktop/MedLinkDuo/app/src/main/java/com/bettor/medlinkduo/ui/[0mPermissionActivity.kt[90m:[0m39[90m:65:[0m A block comment in between other elements on the same line is disallowed [90m(standard:comment-wrapping)[0m
+[90m/Users/changyokim/Desktop/MedLinkDuo/app/src/main/java/com/bettor/medlinkduo/ui/[0mPermissionActivity.kt[90m:[0m52[90m:121:[0m Exceeded max line length (120) [90m(standard:max-line-length)[0m
+[90m/Users/changyokim/Desktop/MedLinkDuo/app/src/main/java/com/bettor/medlinkduo/ui/screens/[0mPermissionGate.kt[90m:[0m1[90m:1:[0m File 'PermissionGate.kt' should not be empty [90m(standard:no-empty-file)[0m
+
+Summary error count (descending) by rule:
+  standard:comment-wrapping: 1
+  standard:max-line-length: 1
+  standard:no-empty-file: 1

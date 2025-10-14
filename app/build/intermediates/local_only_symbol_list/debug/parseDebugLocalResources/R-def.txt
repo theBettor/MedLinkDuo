@@ -1,0 +1,31 @@
+R_DEF: Internal format may change without notice
+local
+color black
+color purple_200
+color purple_500
+color purple_700
+color teal_200
+color teal_700
+color white
+drawable ic_launcher_background
+drawable ic_launcher_foreground
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+string feedback_last_value
+string feedback_no_value
+string feedback_title
+string measurement_btn_end
+string measurement_btn_pause
+string measurement_btn_start
+string measurement_title
+string measurement_waiting
+string nav_go_to_scan
+string scan_btn_rescan
+string scan_device_connect_label
+string scan_device_desc
+string scan_device_rssi_dbm
+string scan_title
+style Theme.MedLinkDuo
+xml backup_rules
+xml data_extraction_rules
