@@ -141,7 +141,11 @@ fun MeasurementScreen(
     // 화면 벗어나면 즉시 정지 (ON_PAUSE)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_PAUSE) vm.pause() }
+        val obs = LifecycleEventObserver { _, e ->
+            if (e == Lifecycle.Event.ON_PAUSE && vm.ui.value.phase == Phase.Measuring) {
+                vm.pause()
+            }
+        }
         lifecycleOwner.lifecycle.addObserver(obs)
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }

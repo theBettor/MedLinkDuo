@@ -53,14 +53,14 @@ class MainActivity : ComponentActivity() {
                         onShowFeedback = { nav.navigate("fb") }
                     )
                 }
-                composable("fb") { backStackEntry ->
-                    val parent = remember(backStackEntry) { nav.getBackStackEntry("meas") }
-                    val svm: SessionViewModel = hiltViewModel(parent)   // ✅ 같은 인스턴스 공유
+                composable("fb") { entry ->
+                    val parent = remember(entry) { nav.getBackStackEntry("meas") }
+                    val svm: SessionViewModel = hiltViewModel(parent) // ✅ 동일 인스턴스
                     FeedbackScreen(
                         vm = svm,
                         onGoToScan = {
-                            nav.popBackStack() // fb 닫기
-                            nav.popBackStack("scan", inclusive = false) // 스캔으로
+                            nav.popBackStack()                    // fb 닫기
+                            nav.popBackStack("scan", inclusive = false)
                         }
                     )
                 }

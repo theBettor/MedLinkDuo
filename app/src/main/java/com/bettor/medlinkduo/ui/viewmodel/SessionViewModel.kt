@@ -16,65 +16,65 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class SessionViewModel
-    @Inject
-    constructor(
-        private val startUseCase: StartMeasurementUseCase,
-        private val pauseUseCase: PauseMeasurementUseCase,
-        private val endUseCase: EndMeasurementUseCase,
-    ) : ViewModel() {
-        private val _ui = MutableStateFlow(MeasureUiState())
-        val ui: StateFlow<MeasureUiState> = _ui
+class SessionViewModel @Inject constructor(
+    private val startUseCase: StartMeasurementUseCase,
+    private val pauseUseCase: PauseMeasurementUseCase,
+    private val endUseCase: EndMeasurementUseCase,
+) : ViewModel() {
 
-        private val _last = MutableStateFlow<Measurement?>(null)
-        val last: StateFlow<Measurement?> = _last
+    private val _ui = MutableStateFlow(MeasureUiState())
+    val ui: StateFlow<MeasureUiState> = _ui
 
-        private val _summary = MutableStateFlow<SessionSummary?>(null)
-        val summary: StateFlow<SessionSummary?> = _summary
+    private val _last = MutableStateFlow<Measurement?>(null)
+    val last: StateFlow<Measurement?> = _last
 
-        fun remeasure() =
-            viewModelScope.launch {
-                if (_ui.value.busy || _ui.value.phase == Phase.Measuring) return@launch
-                _ui.value = _ui.value.copy(busy = true)
-                try {
-                    // 측정 스트림 시작: onEach에서 마지막 값 갱신/저장
-                    startUseCase { m -> _last.value = m } // ← UseCase 호출은 명확히
-                    _ui.value = MeasureUiState(phase = Phase.Measuring, busy = false)
-                } finally {
-                    if (_ui.value.busy) _ui.value = _ui.value.copy(busy = false)
+    private val _summary = MutableStateFlow<SessionSummary?>(null)
+    val summary: StateFlow<SessionSummary?> = _summary
+
+    @Volatile private var lastLocal: Measurement? = null
+
+    fun remeasure() = viewModelScope.launch {
+        if (_ui.value.busy || _ui.value.phase == Phase.Measuring) return@launch
+        _ui.value = _ui.value.copy(busy = true)
+        try {
+            // ✅ 메인 스레드에 즉시 반영 + 로컬 스냅샷 동시 갱신
+            startUseCase { m ->
+                viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                    _last.value = m
+                    lastLocal = m
                 }
             }
-
-        fun pause() =
-            viewModelScope.launch {
-                if (_ui.value.busy || _ui.value.phase != Phase.Measuring) return@launch
-                _ui.value = _ui.value.copy(busy = true)
-                try {
-                    pauseUseCase() // ← 기존엔 ‘pause’ 자체(프로퍼티)여서 호출 안 됨/재귀 위험
-                    _ui.value = MeasureUiState(phase = Phase.Paused, busy = false)
-                } finally {
-                    if (_ui.value.busy) _ui.value = _ui.value.copy(busy = false)
-                }
-            }
-
-    fun end(onSummary: (Measurement?) -> Unit = {}) =
-        viewModelScope.launch {
-            if (_ui.value.busy || _ui.value.phase == Phase.Idle) return@launch
-            _ui.value = _ui.value.copy(busy = true)
-            try {
-                // ✅ 스트림을 멈추기 전에 '현재 값'을 스냅샷
-                val snapshot = _last.value
-                _summary.value = SessionSummary(last = snapshot)
-
-                // 이후 실제 종료 로직 진행 (repo/서비스 stop)
-                endUseCase {
-                    // 콜백이 늦게 와도 이미 _summary 에는 스냅샷이 들어가 있음
-                    onSummary(snapshot)
-                }
-
-                _ui.value = MeasureUiState(phase = Phase.Idle, busy = false)
-            } finally {
-                if (_ui.value.busy) _ui.value = _ui.value.copy(busy = false)
-            }
+            _ui.value = MeasureUiState(phase = Phase.Measuring, busy = false)
+        } finally {
+            if (_ui.value.busy) _ui.value = _ui.value.copy(busy = false)
         }
     }
+
+    fun pause() = viewModelScope.launch {
+        if (_ui.value.busy || _ui.value.phase != Phase.Measuring) return@launch
+        _ui.value = _ui.value.copy(busy = true)
+        try {
+            pauseUseCase()
+            _ui.value = MeasureUiState(phase = Phase.Paused, busy = false)
+        } finally {
+            if (_ui.value.busy) _ui.value = _ui.value.copy(busy = false)
+        }
+    }
+
+    fun end(onSummary: (Measurement?) -> Unit = {}) = viewModelScope.launch {
+        if (_ui.value.busy || _ui.value.phase == Phase.Idle) return@launch
+        _ui.value = _ui.value.copy(busy = true)
+        try {
+            // ✅ 스트림 정지 전 스냅샷 확정
+            val snapshot = lastLocal ?: _last.value
+            _summary.value = SessionSummary(last = snapshot)
+
+            endUseCase {
+                onSummary(snapshot)
+            }
+            _ui.value = MeasureUiState(phase = Phase.Idle, busy = false)
+        } finally {
+            if (_ui.value.busy) _ui.value = _ui.value.copy(busy = false)
+        }
+    }
+}
