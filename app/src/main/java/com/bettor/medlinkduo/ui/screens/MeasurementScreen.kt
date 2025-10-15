@@ -22,8 +22,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -67,8 +70,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun MeasurementScreen(
     vm: SessionViewModel = hiltViewModel(),
-    onGoToScan: () -> Unit, // 스캔 화면으로 이동
-    onShowFeedback: () -> Unit, // ⬅️ 추가: 피드백 화면으로 이동
+    onGoToScan: () -> Unit,
+    onShowFeedback: () -> Unit,
 ) {
     val ctx = LocalContext.current
     val deps = remember { EntryPointAccessors.fromApplication(ctx, AppDepsEntryPoint::class.java) }
@@ -81,30 +84,53 @@ fun MeasurementScreen(
 
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
-    val ph = rememberPlatformHaptics() // ← 추가: 플랫폼 파형
+    val ph = rememberPlatformHaptics()
 
     // 첫 포커스(중앙 값)
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    // 음성 명령: 더블탭 → 음성 / 롱프레스 → 긴급 중단
+    // =========================
+    // ✅ "중단/긴급중단 멘트"를 Phase 전환 후에 보장하도록 플래그 + 이펙트
+    // =========================
+    var pendingPauseAck by rememberSaveable { mutableStateOf(false) }
+    var pauseAckMessage by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // Phase가 Paused로 바뀐 후에만 멘트 출력 (레이스 방지)
+    LaunchedEffect(ui.phase, pendingPauseAck, pauseAckMessage) {
+        if (pendingPauseAck && ui.phase == Phase.Paused) {
+            pauseAckMessage?.let { msg -> tts.speakAndWait(msg) }
+            pendingPauseAck = false
+            pauseAckMessage = null
+        }
+    }
+
+    // 음성 명령: 더블탭 → 음성 / 롱프레스 → 긴급 중단(멘트는 위 이펙트로 출력)
     val launchVoice =
         rememberVoiceCommandLauncher(
             allowed = setOf(Command.ReMeasure, Command.Pause, Command.End, Command.GoScan),
             onCommand = { cmd ->
                 when (cmd) {
-                    Command.ReMeasure -> vm.remeasure()
+                    Command.ReMeasure -> scope.launch {
+                        tts.speakAndWait("측정을 시작합니다.")
+                        vm.remeasure()
+                    }
                     Command.Pause -> {
+                        // 여기서 즉시 speak하지 않고, Phase 전환을 기다렸다가 멘트
+                        pauseAckMessage = "측정을 중단했습니다."
+                        pendingPauseAck = true
                         vm.pause()
                         sensory.error()
                         haptics.play(HapticEvent.SafeStop, ph)
                     }
-                    Command.End -> {
+                    Command.End -> scope.launch {
                         vm.end()
+                        tts.speakAndWait("측정 결과를 보여드립니다.")
                         onShowFeedback()
                     }
-                    Command.GoScan -> {
+                    Command.GoScan -> scope.launch {
                         vm.end()
+                        tts.speakAndWait("기기 선택 화면으로 돌아갑니다.")
                         onGoToScan()
                     }
                     else -> Unit
@@ -115,48 +141,43 @@ fun MeasurementScreen(
     // 화면 벗어나면 즉시 정지 (ON_PAUSE)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        val obs =
-            LifecycleEventObserver { _, e ->
-                if (e == Lifecycle.Event.ON_PAUSE) vm.pause()
-            }
+        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_PAUSE) vm.pause() }
         lifecycleOwner.lifecycle.addObserver(obs)
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
 
-    // RESUMED 상태에서만 새 측정값 숫자 낭독(측정 중일 때)
+    // RESUMED 상태에서만 새 측정값 숫자 낭독(측정 중일 때만)
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             combine(vm.last, vm.ui) { m, u -> m to u.phase }.collect { (m, phase) ->
-                if (phase == Phase.Measuring && m != null) {
-                    // suspend 안전 구간
-                    speakNumeric(m) // 예: "120"
-                }
+                if (phase == Phase.Measuring && m != null) speakNumeric(m)
             }
         }
     }
 
-    // MeasurementScreen 내부 어딘가(Composable 최상단 근처)
+    // 뒤로가기 무시
     BackHandler(enabled = true) {
-        // 뒤로가기 무시 + 선택: 경고음/안내
         sensory.error()
         tts.speak("현재 화면에서는 뒤로가기가 지원되지 않습니다.")
     }
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                // 👇 더블탭: 마지막 값 재낭독 / 롱프레스: 어디서든 ‘긴급 중단’
-                .a11yGestures(
-                    onDoubleTap = { launchVoice() }, // ✅ 공통: 더블탭=음성
-                    onLongPress = { // ✅ 안전: 롱프레스=긴급중단
-                        vm.pause()
-                        sensory.error()
-                        haptics.play(HapticEvent.SafeStop, ph)
-                        tts.speak("측정을 중단했습니다.")
-                    },
-                )
-                .padding(20.dp),
+        Modifier
+            .fillMaxSize()
+            // 더블탭=음성, 롱프레스=긴급중단(멘트는 Phase 전환 후 보장)
+            .a11yGestures(
+                onDoubleTap = { launchVoice() },
+                onLongPress = {
+                    // 긴급 중단도 동일한 경로로 보장
+                    pauseAckMessage = "긴급 중단되었습니다."
+                    pendingPauseAck = true
+                    vm.pause()
+                    sensory.error()
+                    haptics.play(HapticEvent.SafeStop, ph)
+                },
+            )
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // 제목(heading)
@@ -179,55 +200,49 @@ fun MeasurementScreen(
                 text = last?.value ?: stringResource(measurement_waiting),
                 style = MaterialTheme.typography.displaySmall,
                 modifier =
-                    Modifier
-                        .focusRequester(focusRequester)
-                        .focusable(),
+                Modifier
+                    .focusRequester(focusRequester)
+                    .focusable(),
             )
         }
 
         Spacer(Modifier.height(20.dp))
 
-        val guard = rememberActionGuard(scope) // ← 한 줄로 가드 준비
+        val guard = rememberActionGuard(scope)
 
-        @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             maxItemsInEachRow = 3,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // 측정
+            // 측정 시작
             Button(
                 onClick = {
                     guard.launch {
                         tts.speakAndWait("측정을 시작합니다.")
-                        sensory.tick() // 시작 알림(짧게)
+                        sensory.tick()
                         haptics.play(HapticEvent.Connected, ph)
                         vm.remeasure()
                     }
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase != Phase.Measuring,
-                modifier =
-                    Modifier
-                        .minTouchTarget()
-                        .semantics { role = Role.Button },
+                modifier = Modifier.minTouchTarget().semantics { role = Role.Button },
             ) { Text(stringResource(measurement_btn_start)) }
 
-            // 중단
+            // 중단 — 멘트는 Phase 전환 후 LaunchedEffect에서 출력
             OutlinedButton(
                 onClick = {
                     guard.launch {
+                        pauseAckMessage = "측정을 중단했습니다."
+                        pendingPauseAck = true
                         vm.pause()
-                        sensory.vibrate(60) // 손에 확 느껴지게
+                        sensory.vibrate(60)
                         haptics.play(HapticEvent.SafeStop, ph)
-                        tts.speak("측정을 중단했습니다.")
                     }
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase == Phase.Measuring,
-                modifier =
-                    Modifier
-                        .minTouchTarget()
-                        .semantics { role = Role.Button },
+                modifier = Modifier.minTouchTarget().semantics { role = Role.Button },
             ) { Text(stringResource(measurement_btn_pause)) }
 
             // 측정 종료 → Feedback
@@ -235,48 +250,40 @@ fun MeasurementScreen(
                 onClick = {
                     guard.launch {
                         vm.end()
-                        sensory.success() // 완료 찰칵
+                        sensory.success()
                         haptics.play(HapticEvent.ScanDone, ph)
                         tts.speakAndWait("측정 결과를 보여드립니다.")
                         onShowFeedback()
                     }
                 },
                 enabled = !guard.acting && !ui.busy && ui.phase != Phase.Idle,
-                modifier =
-                    Modifier
-                        .minTouchTarget()
-                        .semantics { role = Role.Button },
+                modifier = Modifier.minTouchTarget().semantics { role = Role.Button },
             ) { Text(stringResource(measurement_btn_end)) }
 
+            // 음성 버튼
             VoiceButton(
                 allowed = setOf(Command.ReMeasure, Command.Pause, Command.End, Command.GoScan, Command.RepeatResult),
                 onCommand = { cmd ->
                     when (cmd) {
-                        Command.ReMeasure ->
-                            scope.launch {
-                                tts.speakAndWait("측정을 시작합니다.")
-                                vm.remeasure()
-                            }
-
-                        Command.Pause -> {
-                            vm.pause()
-                            tts.speak("측정을 중단했습니다.")
+                        Command.ReMeasure -> scope.launch {
+                            tts.speakAndWait("측정을 시작합니다.")
+                            vm.remeasure()
                         }
-
-                        Command.End ->
-                            scope.launch {
-                                vm.end()
-                                tts.speakAndWait("측정 결과를 보여드립니다.")
-                                onShowFeedback()
-                            }
-
-                        Command.GoScan ->
-                            scope.launch {
-                                vm.end()
-                                tts.speakAndWait("기기 선택 화면으로 돌아갑니다.")
-                                onGoToScan()
-                            }
-
+                        Command.Pause -> {
+                            pauseAckMessage = "측정을 중단했습니다."
+                            pendingPauseAck = true
+                            vm.pause()
+                        }
+                        Command.End -> scope.launch {
+                            vm.end()
+                            tts.speakAndWait("측정 결과를 보여드립니다.")
+                            onShowFeedback()
+                        }
+                        Command.GoScan -> scope.launch {
+                            vm.end()
+                            tts.speakAndWait("기기 선택 화면으로 돌아갑니다.")
+                            onGoToScan()
+                        }
                         Command.RepeatResult -> last?.let { scope.launch { speakNumeric(it) } }
                         else -> Unit
                     }
@@ -293,10 +300,7 @@ fun MeasurementScreen(
                     }
                 },
                 enabled = !guard.acting,
-                modifier =
-                    Modifier
-                        .minTouchTarget()
-                        .semantics { role = Role.Button },
+                modifier = Modifier.minTouchTarget().semantics { role = Role.Button },
             ) { Text(stringResource(nav_go_to_scan)) }
         }
     }

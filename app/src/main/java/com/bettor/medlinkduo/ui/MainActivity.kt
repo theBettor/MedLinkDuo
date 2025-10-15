@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -41,29 +42,26 @@ class MainActivity : ComponentActivity() {
             val nav = rememberNavController()
 
             NavHost(nav, startDestination = "scan") {
-                composable("scan") { ScanConnectScreen(onSynced = { nav.navigate("meas") }) }
-
+                composable("scan") {
+                    ScanConnectScreen(onSynced = { nav.navigate("meas") })
+                }
                 composable("meas") {
                     val svm: SessionViewModel = hiltViewModel()
                     MeasurementScreen(
                         vm = svm,
-                        onGoToScan = {
-                            nav.popBackStack(route = "scan", inclusive = false)
-                        },
-                        onShowFeedback = { nav.navigate("fb") },
+                        onGoToScan = { nav.popBackStack("scan", inclusive = false) },
+                        onShowFeedback = { nav.navigate("fb") }
                     )
                 }
-
-                composable("fb") {
-                    // ‘meas’와 같은 SessionViewModel 인스턴스를 공유하고 싶다면
-                    // 필요 시 backStackEntry를 parent로 잡아 hiltViewModel(parent) 사용
-                    val svm: SessionViewModel = hiltViewModel()
+                composable("fb") { backStackEntry ->
+                    val parent = remember(backStackEntry) { nav.getBackStackEntry("meas") }
+                    val svm: SessionViewModel = hiltViewModel(parent)   // ✅ 같은 인스턴스 공유
                     FeedbackScreen(
                         vm = svm,
                         onGoToScan = {
-                            nav.popBackStack() // 피드백 닫기
-                            nav.popBackStack(route = "scan", inclusive = false) // 스캔으로
-                        },
+                            nav.popBackStack() // fb 닫기
+                            nav.popBackStack("scan", inclusive = false) // 스캔으로
+                        }
                     )
                 }
             }

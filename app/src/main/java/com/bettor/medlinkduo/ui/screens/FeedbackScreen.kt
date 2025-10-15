@@ -56,16 +56,14 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun FeedbackScreen(
-    vm: SessionViewModel, // ⬅️ 같은 인스턴스를 주입받음
+    vm: SessionViewModel,
     onGoToScan: () -> Unit,
 ) {
     val last by vm.last.collectAsState()
+    val summary by vm.summary.collectAsState()
 
     val ctx = LocalContext.current
-    val deps =
-        remember {
-            EntryPointAccessors.fromApplication(ctx, AppDepsEntryPoint::class.java)
-        }
+    val deps = remember { EntryPointAccessors.fromApplication(ctx, AppDepsEntryPoint::class.java) }
     val speakNumeric = deps.speakNumeric()
     val sensory = deps.sensory()
     val tts = deps.tts()
@@ -74,82 +72,87 @@ fun FeedbackScreen(
     val haptics = rememberHaptics()
     val ph = rememberPlatformHaptics()
 
-    // 포커스 + 진입 하프틱을 하나의 이펙트로
+    // 포커스 + 진입 하프틱
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         haptics.play(HapticEvent.ScanDone)
         focusRequester.requestFocus()
     }
 
-    // 더블탭 = 음성 명령(여기는 GoScan만 허용), 롱프레스 = 닫고 스캔으로
+    // 더블탭 = 음성 명령(GoScan), 롱프레스 = 닫고 스캔으로 (TTS 먼저)
     val launchVoice =
         rememberVoiceCommandLauncher(
             allowed = setOf(Command.GoScan),
-            onCommand = { onGoToScan() },
+            onCommand = {
+                scope.launch {
+                    tts.speakAndWait("기기 선택 화면으로 돌아갑니다.")
+                    onGoToScan()
+                }
+            },
         )
 
-    // 화면이 RESUMED일 때만 요약의 마지막 값 숫자 낭독
+    // 화면이 RESUMED일 때 값 낭독 (summary 없으면 last로 대체)
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             vm.summary.collectLatest { s ->
-                s?.last?.let { speakNumeric(it) }
+                val m = s?.last ?: last
+                m?.let { speakNumeric(it) }
             }
         }
     }
 
+    // 뒤로가기 무시
     BackHandler(enabled = true) {
         sensory.error()
         tts.speak("피드백 화면에서는 뒤로가기가 지원되지 않습니다. 화면을 길게 눌러 스캔 화면으로 돌아갈 수 있습니다.")
     }
 
-    // 🔽 아래 UI는 “기존 디자인”에 맞춰 바꿔 넣어도 됨
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                // 더블탭: 마지막 값 재낭독 / 롱프레스: 피드백 닫기
-                .a11yGestures(
-                    onDoubleTap = { launchVoice() }, // ✅ 공통: 더블탭=음성(스캔으로)
-                    onLongPress = { // ✅ 보조: 롱프레스=닫고 스캔으로
-                        haptics.play(HapticEvent.SafeStop, ph)
+        Modifier
+            .fillMaxSize()
+            // 더블탭=음성, 롱프레스=닫고 스캔(TTS 먼저)
+            .a11yGestures(
+                onDoubleTap = { launchVoice() },
+                onLongPress = {
+                    haptics.play(HapticEvent.SafeStop, ph)
+                    scope.launch {
+                        tts.speakAndWait("피드백 화면을 닫고 기기 선택 화면으로 돌아갑니다.")
                         onGoToScan()
-                    },
-                )
-                .padding(20.dp),
+                    }
+                },
+            )
+            .padding(20.dp),
         horizontalAlignment = Alignment.Start,
     ) {
-        // 제목: heading 지정 + 첫 포커스 진입점
+        // 제목: heading + 첫 포커스
         Text(
             stringResource(feedback_title),
             style = MaterialTheme.typography.headlineMedium,
             modifier =
-                Modifier
-                    .semantics { heading() }
-                    .focusRequester(focusRequester)
-                    .focusable(),
+            Modifier
+                .semantics { heading() }
+                .focusRequester(focusRequester)
+                .focusable(),
         )
 
         Spacer(Modifier.height(12.dp))
 
-        // 결과 카드
+        // 결과 카드 (summary 없으면 last로 대체)
         Box(
             modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .border(2.dp, MaterialTheme.colorScheme.onBackground)
-                    .padding(16.dp),
+            Modifier
+                .fillMaxWidth()
+                .border(2.dp, MaterialTheme.colorScheme.onBackground)
+                .padding(16.dp),
         ) {
+            val display = summary?.last ?: last
             val line =
-                vm.summary.collectAsState().value?.last?.let {
-                    stringResource(feedback_last_value, it.value)
-                } ?: stringResource(feedback_no_value)
+                display?.let { m -> stringResource(feedback_last_value, m.value) }
+                    ?: stringResource(feedback_no_value)
 
-            Text(
-                text = line,
-                textAlign = TextAlign.Start,
-                style = MaterialTheme.typography.titleLarge,
-            )
+            Text(text = line, textAlign = TextAlign.Start, style = MaterialTheme.typography.titleLarge)
         }
 
         Spacer(Modifier.height(20.dp))

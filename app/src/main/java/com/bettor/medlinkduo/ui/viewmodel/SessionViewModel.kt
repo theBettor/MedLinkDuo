@@ -57,19 +57,24 @@ class SessionViewModel
                 }
             }
 
-        fun end(onSummary: (Measurement?) -> Unit = {}) =
-            viewModelScope.launch {
-                if (_ui.value.busy || _ui.value.phase == Phase.Idle) return@launch
-                _ui.value = _ui.value.copy(busy = true)
-                try {
-                    endUseCase {
-                        val lastMeas = _last.value
-                        _summary.value = SessionSummary(last = lastMeas)
-                        onSummary(lastMeas)
-                    } // stop + 요약 생성
-                    _ui.value = MeasureUiState(phase = Phase.Idle, busy = false)
-                } finally {
-                    if (_ui.value.busy) _ui.value = _ui.value.copy(busy = false)
+    fun end(onSummary: (Measurement?) -> Unit = {}) =
+        viewModelScope.launch {
+            if (_ui.value.busy || _ui.value.phase == Phase.Idle) return@launch
+            _ui.value = _ui.value.copy(busy = true)
+            try {
+                // ✅ 스트림을 멈추기 전에 '현재 값'을 스냅샷
+                val snapshot = _last.value
+                _summary.value = SessionSummary(last = snapshot)
+
+                // 이후 실제 종료 로직 진행 (repo/서비스 stop)
+                endUseCase {
+                    // 콜백이 늦게 와도 이미 _summary 에는 스냅샷이 들어가 있음
+                    onSummary(snapshot)
                 }
+
+                _ui.value = MeasureUiState(phase = Phase.Idle, busy = false)
+            } finally {
+                if (_ui.value.busy) _ui.value = _ui.value.copy(busy = false)
             }
+        }
     }
