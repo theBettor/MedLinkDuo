@@ -59,4 +59,15 @@ object PermissionMgr {
         if (miss.isEmpty()) return false
         return miss.any { !ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }
     }
+
+    fun shouldShowAnyRationale(activity: Activity): Boolean {
+        val miss = missing(activity)           // 아직 허용되지 않은 권한들만
+        if (miss.isEmpty()) return false       // 모두 허용된 상태면 rationale 필요 없음
+        for (p in miss) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(activity, p)) {
+                return true
+            }
+        }
+        return false
+    }
 }
