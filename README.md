@@ -4,6 +4,12 @@
 
 **핵심:** **음성(TTS) + 진동/사운드 + 제스처**로 권한 → 연결 → 측정 → 피드백을 끊김 없이 완주하도록 설계했습니다.
 
+## 데모영상
+
+<video src="https://github.com/user-attachments/assets/2a8b8e7b-de1f-4328-8587-5b35d36855ad"
+       controls playsinline loop muted
+       style="max-width:100%;height:auto;border-radius:12px;"></video>
+
 ## 다운로드
 
 [⬇️ Android APK 받기](https://github.com/theBettor/MedLinkDuo/releases/tag/apk)
